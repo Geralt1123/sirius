@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  sirius-postgres:
+    container_name: sirius-postgres
+    image: sirius/postgres:$APP_VERSION
+    build:
+      context: ../../infrastructure/Backend.Postgres.Dockerfile
+      dockerfile: ../../docker/Postgres.Dockerfile
+      args:
+        BASE_POSTGRES_IMAGE: $BASE_POSTGRES_IMAGE
+    environment:
+      - POSTGRESQL_ADMIN_PASSWORD=$POSTGRESQL_ADMIN_PASSWORD
+      - DB_USER_SIRIUS=$DB_USER_SIRIUS
+      - DB_PASS_SIRIUS=$DB_PASS_SIRIUS
+      - DB_NAME=$POSTGRES_DB_NAME
+      - DB_SCHEMA_NAME_SIRIUS=$DB_SCHEMA_NAME_SIRIUS
+    ports:
+      - "5432:5432"
+    volumes:
+      - sirius_pg_data:/var/lib/pgsql/data
+
+  sirius-minio:
+    container_name: sirius-minio
+    image: sirius/minio:$APP_VERSION
+    build:
+      context: .
+      dockerfile: ../../docker/Backend.Minio.Dockerfile
+      args:
+        BASE_MINIO_IMAGE: $BASE_MINIO_IMAGE
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - sirius_minio_data:/bitnami/minio/data
+    environment:
+      - MINIO_ROOT_USER=$MINIO_USER
+      - MINIO_ROOT_PASSWORD=$MINIO_PASSWORD
+      - MINIO_DEFAULT_BUCKETS=$S3_FILES_BUCKET
+
+  sirius-backend-migrations:
+    container_name: sirius-backend-migrations
+    image: sirius/backend-migrations:$APP_VERSION
+    build:
+      context: ../../src/backend
+      dockerfile: ../../docker/Backend.Service.Dockerfile
+      args:
+        BASE_PYTHON_IMAGE: $BASE_PYTHON_IMAGE
+        PIP_INDEX_URL_PARAM: $PIP_INDEX_URL_PARAM
+        PIP_TRUSTED_HOST_PARAM: $PIP_TRUSTED_HOST_PARAM
+        RM_REPOS_COMMAND: $RM_REPOS_COMMAND
+        GET_REPOS_UBI_COMMAND: $GET_REPOS_UBI_COMMAND
+        GET_REPOS_EPEL_COMMAND: $GET_REPOS_EPEL_COMMAND
+      target: final
+    command: alembic upgrade head
+    environment:
+      - DB_HOST=$DB_HOST_SIRIUS
+      - DB_PORT=$DB_PORT_SIRIUS
+      - DB_USER=$DB_USER_SIRIUS
+      - DB_PASS=$DB_PASS_SIRIUS
+      - DB_NAME=$POSTGRES_DB_NAME
+      - DB_SCHEMA_NAME=$DB_SCHEMA_NAME_SIRIUS
+      - DB_POOL_SIZE=$DB_POOL_SIZE_SIRIUS
+    depends_on:
+      - sirius-postgres
+
+
+volumes:
+  sirius_minio_data:
+  sirius_pg_data:
+  sirius_logs:

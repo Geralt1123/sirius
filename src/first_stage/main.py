@@ -39,6 +39,12 @@ class MainApp(QMainWindow):
         self.tab_widget = QTabWidget()
         self.setCentralWidget(self.tab_widget)
 
+        # Устанавливаем стиль для вкладок
+        self.tab_widget.setStyleSheet(self.get_tab_styles())
+
+        # Устанавливаем стиль для главного окна и центрального виджета
+        self.setStyleSheet(self.get_main_window_styles())
+
         self.first_stage = FirstStage()
         self.markup_window = MarkupWindow()
 
@@ -49,6 +55,58 @@ class MainApp(QMainWindow):
 
         self.setWindowTitle("Image Annotation Tool")
         self.resize(1422, 200)
+
+    def get_tab_styles(self):
+        return """
+            QTabWidget {
+                background-color: #151D2C;  /* Цвет фона для всего QTabWidget */
+                border: none;
+            }
+            
+            QTabBar {
+                background-color: #0078d7;  /* Цвет фона для QTabBar */
+                padding: 5px;  /* Отступы вокруг вкладок */
+                border: none;  /* Убираем границу */
+            }
+            
+            QTabBar::tab {
+                background: #0078d7;  /* Цвет фона для вкладок */
+                color: white;  /* Цвет текста на вкладках */
+                padding: 5px;  /* Отступы внутри вкладок */
+                border: none;  /* Граница вкладок */
+            }
+
+            QTabBar::tab:selected {
+                background: #0056a1;  /* Цвет фона для выбранной вкладки */
+                color: white;  /* Цвет текста для выбранной вкладки */
+                border: none;
+            }
+            
+            QTabBar::tab:!selected { 
+                margin-right: 1px; 
+            }
+
+            QTabBar::tab:hover {
+                background: #0056a1;  /* Цвет фона при наведении на вкладку */
+                border: none;
+            }
+        """
+
+
+    def get_main_window_styles(self):
+        return """
+            QMainWindow {
+                background-color: #151D2C;  /* Цвет фона для главного окна */
+                background: #151D2C;  /* Цвет фона для вкладок */
+                border: none;
+            }
+
+            QWidget {
+                background-color: #151D2C;  /* Цвет фона для центрального виджета */
+                background: #151D2C;  /* Цвет фона для вкладок */
+                border: none;
+            }
+        """
 
     def adjust_window_size(self, index):
         """Изменяет размер главного окна в зависимости от текущей вкладки."""

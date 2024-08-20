@@ -33,21 +33,12 @@ async def file_get(
     return response
 
 
-@router.get(path="/get_nexst_file", summary="Следующий файла", response_model=FileResponseModel)
+@router.get(path="/get_file_list", summary="Список файлов", response_model=FileResponseModel)
 @inject
-async def next_file_get(
-    file_id: UUID = Query(),
-    controller: Service = Depends(Provide[FileControllerContainer.get_next_file_controller])
+async def get_final_file_list(
+    controller: Service = Depends(Provide[FileControllerContainer.get_final_file_list_controller])
 ):
-    response = await controller(file_id)
+    response = await controller()
     return response
 
 
-@router.get(path="/get_previous_file", summary="предыдущий файла", response_model=FileResponseModel)
-@inject
-async def next_file_get(
-    file_id: UUID = Query(),
-    controller: Service = Depends(Provide[FileControllerContainer.get_previous_file_controller])
-):
-    response = await controller(file_id)
-    return response

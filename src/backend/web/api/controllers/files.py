@@ -1,6 +1,8 @@
 import io
 from uuid import uuid4, UUID
 from dataclasses import dataclass
+
+import cv2
 import numpy as np
 
 from common.exceptions import ControllerException
@@ -34,7 +36,8 @@ class UploadFileController(AsyncService):
                 raise ValueError("Данные в файле не являются numpy массивом.")
 
             tiles = [arr[x:x + M, y:y + N] for x in range(0, arr.shape[0], M) for y in range(0, arr.shape[1], N)]
-            firs_element, previous_file = None, None
+            previous_file = None
+            files = []
             for tile in tiles:
                 file_id = uuid4()
                 s3_model = S3Model(
@@ -50,11 +53,11 @@ class UploadFileController(AsyncService):
                         previous_file=previous_file if previous_file else None
                     )
                 )
-                if firs_element is None:
-                    firs_element = file_id
+                files.append(file_id)
                 previous_file = file_id
             await orm_uow.commit()
-        return firs_element
+            cv2.GaussianBlur
+        return files
 
 
 @dataclass(kw_only=True, slots=True, frozen=True)
@@ -77,46 +80,16 @@ class DownloadFileController(AsyncService):
 
 
 @dataclass(kw_only=True, slots=True, frozen=True)
-class GetNextFileController(AsyncService):
-    """Получение следующего изображения"""
+class GetFileListController(AsyncService):
+    """Получение списка изображений на разметку"""
 
     orm_unit_of_work: FileUnitOfWork
     storage_repository: S3Repository
 
     async def __call__(
         self,
-        file_id: UUID
     ):
         async with self.orm_unit_of_work as orm_uow:
-            parent_file = await orm_uow.files.get(previous_file=file_id)
-        if not parent_file:
-            raise ControllerException("Нет следующего файла")
-        file_bytes = self.storage_repository.get(
-            bucket_name="sirius", object_name=str(parent_file.id)
-        )
-        image = np.reshape(np.frombuffer(file_bytes, dtype=np.uint8), (128, 1024))
+            files = await orm_uow.files.get(is_final_image=True)
 
-        return image
-
-
-@dataclass(kw_only=True, slots=True, frozen=True)
-class GetPreviousFileController(AsyncService):
-    """Получение предыдущего изображения"""
-
-    orm_unit_of_work: FileUnitOfWork
-    storage_repository: S3Repository
-
-    async def __call__(
-        self,
-        file_id: UUID
-    ):
-        async with self.orm_unit_of_work as orm_uow:
-            file = await orm_uow.files.get(id=file_id)
-        if not file.previous_file:
-            raise ControllerException("Нет предыдущего файла")
-        file_bytes = self.storage_repository.get(
-            bucket_name="sirius", object_name=str(file.previous_file)
-        )
-        image = np.reshape(np.frombuffer(file_bytes, dtype=np.uint8), (128, 1024))
-
-        return image
+        return files

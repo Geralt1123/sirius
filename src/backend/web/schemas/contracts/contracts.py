@@ -13,3 +13,7 @@ class IdModel(BaseModel):
 
 class FileResponseModel(RootModel, arbitrary_types_allowed=True):
     root: list[list[int]]
+
+
+class FileIdsResponseModel(RootModel):
+    root: list[UUID] | None

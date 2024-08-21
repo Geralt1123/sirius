@@ -8,7 +8,7 @@ from dependency_injector.wiring import inject, Provide
 from interfaces import Service
 from web.api.containers import FileControllerContainer
 from web.schemas.contracts import DataModel
-from web.schemas.contracts.contracts import FileResponseModel
+from web.schemas.contracts.contracts import FileResponseModel, FileIdsResponseModel
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -42,3 +42,34 @@ async def get_final_file_list(
     return response
 
 
+@router.get(path="/gaus", summary="Фильтр гауса", response_model=FileIdsResponseModel)
+@inject
+async def gaus(
+    files_id: list[UUID] = Query(),
+    gaus_core_x: int = Query(),
+    gaus_core_y: int = Query(),
+    gaus_sigma_x: int = Query(),
+    gaus_sigma_y: int = Query(),
+    controller: Service = Depends(Provide[FileControllerContainer.gaus_controller])
+):
+    response = await controller(files_id, gaus_core_x, gaus_core_y, gaus_sigma_x, gaus_sigma_y)
+    return response
+
+
+@router.get(path="/previous_file_list", summary="Фильтр гауса", response_model=FileIdsResponseModel)
+@inject
+async def get_previous_file_list(
+    files_id: list[UUID] = Query(),
+    controller: Service = Depends(Provide[FileControllerContainer.get_previous_file_list_controller])
+):
+    response = await controller(files_id)
+    return response
+
+
+@router.get(path="/save_files", summary="Пометка изображений как финальное")
+@inject
+async def save_files(
+    files_id: list[UUID] = Query(),
+    controller: Service = Depends(Provide[FileControllerContainer.save_files_controller])
+):
+    await controller(files_id)

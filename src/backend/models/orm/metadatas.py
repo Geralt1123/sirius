@@ -10,5 +10,10 @@ class FileMetadata(Base):
     __tablename__ = 'file_metadata'
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    gaus_core_x: Mapped[int] = mapped_column(nullable=True)
+    gaus_core_y: Mapped[int] = mapped_column(nullable=True)
+    gaus_sigma_x: Mapped[int] = mapped_column(nullable=True)
+    gaus_sigma_y: Mapped[int] = mapped_column(nullable=True)
+
 
     files: Mapped[list["File"]] = relationship(back_populates="file_metadata", lazy="select")

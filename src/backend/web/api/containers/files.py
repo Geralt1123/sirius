@@ -40,6 +40,12 @@ class FileControllerContainer(containers.DeclarativeContainer):
         storage_repository=storage.s3_repository,
     )
 
+    get_previous_file_list_controller = providers.Factory(
+        GetPreviousFileListController,
+        orm_unit_of_work=file_uow,
+        storage_repository=storage.s3_repository,
+    )
+
     save_files_controller = providers.Factory(
         SaveFilesController,
         orm_unit_of_work=file_uow,

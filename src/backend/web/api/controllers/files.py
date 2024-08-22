@@ -129,15 +129,6 @@ class AddFilterController(AsyncService):
                         #  Применяем метод
                         update_image = cv2.GaussianBlur(image, (gaus_core_x, gaus_core_y), gaus_sigma_x, gaus_sigma_y)
 
-                        metadata_id = uuid4()
-                        metadata = FileMetadata(
-                            id=metadata_id,
-                            gaus_core_x=gaus_core_x,
-                            gaus_core_y=gaus_core_y,
-                            gaus_sigma_x=gaus_sigma_x,
-                            gaus_sigma_y=gaus_sigma_y
-                        )
-
                     case "erode":
                         eroz_x = int(meta.get("eroz_x"))
                         eroz_y = int(meta.get("eroz_y"))
@@ -146,14 +137,6 @@ class AddFilterController(AsyncService):
                         struct_elem = np.ones((eroz_x, eroz_y), np.uint8)
                         #  Применяем метод
                         update_image = cv2.erode(image, struct_elem, iterations=eroz_iteration)
-
-                        metadata_id = uuid4()
-                        metadata = FileMetadata(
-                            id=metadata_id,
-                            eroz_x=eroz_x,
-                            eroz_y=eroz_y,
-                            eroz_iteration=eroz_iteration,
-                        )
 
                     case "dilatation":
                         dilatation_x = int(meta.get("dilatation_x"))
@@ -164,14 +147,6 @@ class AddFilterController(AsyncService):
                         #  Применяем метод
                         update_image = cv2.dilate(image, struct_elem, iterations=dilatation_iteration)
 
-                        metadata_id = uuid4()
-                        metadata = FileMetadata(
-                            id=metadata_id,
-                            dilatation_x=dilatation_x,
-                            dilatation_y=dilatation_y,
-                            dilatation_iteration=dilatation_iteration,
-                        )
-
                     case "bilat":
                         bilat_d = int(meta.get("bilat_d"))
                         bilat_color = int(meta.get("bilat_color"))
@@ -180,13 +155,11 @@ class AddFilterController(AsyncService):
                         #  Применяем метод
                         update_image = cv2.bilateralFilter(image, bilat_d, bilat_color, bilat_coord)
 
-                        metadata_id = uuid4()
-                        metadata = FileMetadata(
-                            id=metadata_id,
-                            bilat_d=bilat_d,
-                            bilat_color=bilat_color,
-                            bilat_coord=bilat_coord,
-                        )
+                metadata_id = uuid4()
+                metadata = FileMetadata(
+                    id=metadata_id,
+                    meta=meta
+                )
 
                 await orm_uow.file_metadatas.insert(metadata)
                 await orm_uow.commit()

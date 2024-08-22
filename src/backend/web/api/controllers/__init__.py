@@ -1,11 +1,11 @@
 from web.api.controllers.files import UploadFileController, DownloadFileController, GetFileListController, \
-    AddGausFilterController, GetPreviousFileListController, SaveFilesController
+    AddFilterController, GetPreviousFileListController, SaveFilesController
 
 __all__ = (
     "UploadFileController",
     "DownloadFileController",
     "GetFileListController",
-    "AddGausFilterController",
+    "AddFilterController",
     "GetPreviousFileListController",
     "SaveFilesController",
 )

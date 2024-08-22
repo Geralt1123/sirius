@@ -42,17 +42,16 @@ async def get_final_file_list(
     return response
 
 
-@router.get(path="/gaus", summary="Фильтр гауса", response_model=FileIdsResponseModel)
+@router.get(path="/add_method", summary="Фильтр гауса", response_model=FileIdsResponseModel)
 @inject
 async def gaus(
     files_id: list[UUID] = Query(),
-    gaus_core_x: int = Query(),
-    gaus_core_y: int = Query(),
-    gaus_sigma_x: int = Query(),
-    gaus_sigma_y: int = Query(),
+    method: str = Query(),
+    meta: dict = Body(),
+
     controller: Service = Depends(Provide[FileControllerContainer.gaus_controller])
 ):
-    response = await controller(files_id, gaus_core_x, gaus_core_y, gaus_sigma_x, gaus_sigma_y)
+    response = await controller(files_id, method, meta)
     return response
 
 

@@ -86,22 +86,21 @@ class FirstStage(QMainWindow, FirstStageUi):
 
     def add_gaus_func(self):
         """Применяет метод гауса"""
-        gaus_core_x = self.gaus_core_x.toPlainText()
-        gaus_core_y = self.gaus_core_y.toPlainText()
-        gaus_sigma_x = self.gaus_sigma_x.toPlainText()
-        gaus_sigma_y = self.gaus_sigma_y.toPlainText()
+        meta = {"gaus_core_x": self.gaus_core_x.toPlainText(),
+                "gaus_core_y": self.gaus_core_y.toPlainText(),
+                "gaus_sigma_x": self.gaus_sigma_x.toPlainText(),
+                "gaus_sigma_y": self.gaus_sigma_y.toPlainText()
+                }
 
         self.previous_file_list = self.file_list
 
         self.file_list = requests.get(
-            "http://localhost:8000/sirius/files/gaus",
+            "http://localhost:8000/sirius/files/add_method",
             params={
                 "files_id": self.file_list,
-                "gaus_core_x": gaus_core_x,
-                "gaus_core_y": gaus_core_y,
-                "gaus_sigma_x": gaus_sigma_x,
-                "gaus_sigma_y": gaus_sigma_y
-            }
+                "method": "gaus",
+            },
+            json=meta
         ).json()
 
         self.current_image_id = self.file_list[self.current_index]

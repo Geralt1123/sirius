@@ -1,7 +1,7 @@
 from dependency_injector import containers, providers
 from units_of_work import FileUnitOfWork
 from web.api.controllers import (UploadFileController, DownloadFileController, GetFileListController,
-                                 AddGausFilterController, GetPreviousFileListController, SaveFilesController)
+                                 AddFilterController, GetPreviousFileListController, SaveFilesController)
 
 
 class FileControllerContainer(containers.DeclarativeContainer):
@@ -35,7 +35,7 @@ class FileControllerContainer(containers.DeclarativeContainer):
     )
 
     gaus_controller = providers.Factory(
-        AddGausFilterController,
+        AddFilterController,
         orm_unit_of_work=file_uow,
         storage_repository=storage.s3_repository,
     )

@@ -96,8 +96,8 @@ class GetFileListController(AsyncService):
 
 
 @dataclass(kw_only=True, slots=True, frozen=True)
-class AddGausFilterController(AsyncService):
-    """Применение фильтра гауса"""
+class AddFilterController(AsyncService):
+    """Применение фильтра"""
 
     orm_unit_of_work: FileUnitOfWork
     storage_repository: S3Repository
@@ -105,28 +105,16 @@ class AddGausFilterController(AsyncService):
     async def __call__(
         self,
         files_id: list,
-        gaus_core_x: int,
-        gaus_core_y: int,
-        gaus_sigma_x: int,
-        gaus_sigma_y: int,
+        # gaus_core_x: int,
+        # gaus_core_y: int,
+        # gaus_sigma_x: int,
+        # gaus_sigma_y: int,
+        method: str,
+        meta: dict
     ):
         async with self.orm_unit_of_work as orm_uow:
             update_files_id = []
-            metadata_id = uuid4()
-            metadata = FileMetadata(
-                id=metadata_id,
-                gaus_core_x=gaus_core_x,
-                gaus_core_y=gaus_core_y,
-                gaus_sigma_x=gaus_sigma_x,
-                gaus_sigma_y=gaus_sigma_y
-            )
-            await orm_uow.file_metadatas.insert(metadata)
-            await orm_uow.commit()
-
             for file_id in files_id:
-
-                #  Получаем запись бд
-                file = await orm_uow.files.get(id=file_id)
                 #  Получаем файл из хранилища
                 file_bytes = self.storage_repository.get(
                     bucket_name="sirius", object_name=str(file_id)
@@ -134,8 +122,31 @@ class AddGausFilterController(AsyncService):
                 #  Преобразуем в массив
                 image = np.reshape(np.frombuffer(file_bytes, dtype=np.uint8), (128, 1024))
 
-                #  Применяем метод
-                update_image = cv2.GaussianBlur(image, (gaus_core_x, gaus_core_y), gaus_sigma_x, gaus_sigma_y)
+                match method:
+                    case "gaus":
+
+                        gaus_core_x = int(meta.get("gaus_core_x"))
+                        gaus_core_y = int(meta.get("gaus_core_y"))
+                        gaus_sigma_x = int(meta.get("gaus_sigma_x"))
+                        gaus_sigma_y = int(meta.get("gaus_sigma_y"))
+
+                        #  Применяем метод
+                        update_image = cv2.GaussianBlur(image, (gaus_core_x, gaus_core_y), gaus_sigma_x, gaus_sigma_y)
+
+                        metadata_id = uuid4()
+                        metadata = FileMetadata(
+                            id=metadata_id,
+                            gaus_core_x=gaus_core_x,
+                            gaus_core_y=gaus_core_y,
+                            gaus_sigma_x=gaus_sigma_x,
+                            gaus_sigma_y=gaus_sigma_y
+                        )
+
+                await orm_uow.file_metadatas.insert(metadata)
+                await orm_uow.commit()
+
+                #  Получаем запись бд
+                file = await orm_uow.files.get(id=file_id)
 
                 update_image_id = uuid4()
                 update_files_id.append(update_image_id)

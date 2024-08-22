@@ -14,6 +14,8 @@ class FileMetadata(Base):
     gaus_core_y: Mapped[int] = mapped_column(nullable=True)
     gaus_sigma_x: Mapped[int] = mapped_column(nullable=True)
     gaus_sigma_y: Mapped[int] = mapped_column(nullable=True)
-
+    eroz_x: Mapped[int] = mapped_column(nullable=True)
+    eroz_y: Mapped[int] = mapped_column(nullable=True)
+    eroz_iteration: Mapped[int] = mapped_column(nullable=True)
 
     files: Mapped[list["File"]] = relationship(back_populates="file_metadata", lazy="select")

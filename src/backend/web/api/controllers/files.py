@@ -105,10 +105,6 @@ class AddFilterController(AsyncService):
     async def __call__(
         self,
         files_id: list,
-        # gaus_core_x: int,
-        # gaus_core_y: int,
-        # gaus_sigma_x: int,
-        # gaus_sigma_y: int,
         method: str,
         meta: dict
     ):
@@ -140,6 +136,23 @@ class AddFilterController(AsyncService):
                             gaus_core_y=gaus_core_y,
                             gaus_sigma_x=gaus_sigma_x,
                             gaus_sigma_y=gaus_sigma_y
+                        )
+
+                    case "erode":
+                        eroz_x = int(meta.get("eroz_x"))
+                        eroz_y = int(meta.get("eroz_y"))
+                        eroz_iteration = int(meta.get("eroz_iteration"))
+
+                        struct_elem = np.ones((eroz_x, eroz_y), np.uint8)
+                        #  Применяем метод
+                        update_image = cv2.erode(image, struct_elem, iterations=eroz_iteration)
+
+                        metadata_id = uuid4()
+                        metadata = FileMetadata(
+                            id=metadata_id,
+                            eroz_x=eroz_x,
+                            eroz_y=eroz_y,
+                            eroz_iteration=eroz_iteration,
                         )
 
                 await orm_uow.file_metadatas.insert(metadata)

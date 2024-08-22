@@ -25,6 +25,7 @@ class FirstStage(QMainWindow, FirstStageUi):
         self.previous_button.clicked.connect(self.get_previous_image)
         self.add_gaus.clicked.connect(self.add_gaus_func)
         self.add_eroz.clicked.connect(self.add_eroz_func)
+        self.add_dilatation.clicked.connect(self.add_dilatation_func)
         self.unstage_parametrs.clicked.connect(self.unstage_parametrs_func)
         self.save_button.clicked.connect(self.save_button_func)
 
@@ -123,6 +124,29 @@ class FirstStage(QMainWindow, FirstStageUi):
             params={
                 "files_id": self.file_list,
                 "method": "erode",
+            },
+            json=meta
+        ).json()
+
+        self.current_image_id = self.file_list[self.current_index]
+        self.open_api_image()  # image form set image
+
+    def add_dilatation_func(self):
+        """Применяет метод Дилатации"""
+
+        meta = {
+            "dilatation_x": self.dilatation_x.toPlainText(),
+            "dilatation_y": self.dilatation_y.toPlainText(),
+            "dilatation_iteration": self.dilatation_iteration.toPlainText(),
+        }
+
+        self.previous_file_list = self.file_list
+
+        self.file_list = requests.get(
+            "http://localhost:8000/sirius/files/add_method",
+            params={
+                "files_id": self.file_list,
+                "method": "dilatation",
             },
             json=meta
         ).json()

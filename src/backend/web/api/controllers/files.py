@@ -155,6 +155,23 @@ class AddFilterController(AsyncService):
                             eroz_iteration=eroz_iteration,
                         )
 
+                    case "dilatation":
+                        dilatation_x = int(meta.get("dilatation_x"))
+                        dilatation_y = int(meta.get("dilatation_y"))
+                        dilatation_iteration = int(meta.get("dilatation_iteration"))
+
+                        struct_elem = np.ones((dilatation_x, dilatation_y), np.uint8)
+                        #  Применяем метод
+                        update_image = cv2.dilate(image, struct_elem, iterations=dilatation_iteration)
+
+                        metadata_id = uuid4()
+                        metadata = FileMetadata(
+                            id=metadata_id,
+                            dilatation_x=dilatation_x,
+                            dilatation_y=dilatation_y,
+                            dilatation_iteration=dilatation_iteration,
+                        )
+
                 await orm_uow.file_metadatas.insert(metadata)
                 await orm_uow.commit()
 

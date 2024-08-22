@@ -20,5 +20,8 @@ class FileMetadata(Base):
     dilatation_x: Mapped[int] = mapped_column(nullable=True)
     dilatation_y: Mapped[int] = mapped_column(nullable=True)
     dilatation_iteration: Mapped[int] = mapped_column(nullable=True)
+    bilat_d: Mapped[int] = mapped_column(nullable=True)
+    bilat_color: Mapped[int] = mapped_column(nullable=True)
+    bilat_coord: Mapped[int] = mapped_column(nullable=True)
 
     files: Mapped[list["File"]] = relationship(back_populates="file_metadata", lazy="select")

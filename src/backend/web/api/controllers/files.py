@@ -172,6 +172,22 @@ class AddFilterController(AsyncService):
                             dilatation_iteration=dilatation_iteration,
                         )
 
+                    case "bilat":
+                        bilat_d = int(meta.get("bilat_d"))
+                        bilat_color = int(meta.get("bilat_color"))
+                        bilat_coord = int(meta.get("bilat_coord"))
+
+                        #  Применяем метод
+                        update_image = cv2.bilateralFilter(image, bilat_d, bilat_color, bilat_coord)
+
+                        metadata_id = uuid4()
+                        metadata = FileMetadata(
+                            id=metadata_id,
+                            bilat_d=bilat_d,
+                            bilat_color=bilat_color,
+                            bilat_coord=bilat_coord,
+                        )
+
                 await orm_uow.file_metadatas.insert(metadata)
                 await orm_uow.commit()
 

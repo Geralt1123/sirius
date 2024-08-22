@@ -26,6 +26,7 @@ class FirstStage(QMainWindow, FirstStageUi):
         self.add_gaus.clicked.connect(self.add_gaus_func)
         self.add_eroz.clicked.connect(self.add_eroz_func)
         self.add_dilatation.clicked.connect(self.add_dilatation_func)
+        self.add_bilat.clicked.connect(self.add_bilat_func)
         self.unstage_parametrs.clicked.connect(self.unstage_parametrs_func)
         self.save_button.clicked.connect(self.save_button_func)
 
@@ -69,6 +70,8 @@ class FirstStage(QMainWindow, FirstStageUi):
 
     def open_api_image(self):
         """ Подтягивает необходимы для фото в форме данные"""
+        if not self.current_image_id:
+            return 0
         self.image_name.setText(self.current_image_id)
 
         image_array = requests.get("http://localhost:8000/sirius/files/get_file",
@@ -154,8 +157,30 @@ class FirstStage(QMainWindow, FirstStageUi):
         self.current_image_id = self.file_list[self.current_index]
         self.open_api_image()  # image form set image
 
-    def unstage_parametrs_func(self):
+    def add_bilat_func(self):
+        """Применяет двусторонний фильтр"""
 
+        meta = {
+            "bilat_d": self.bilat_d.toPlainText(),
+            "bilat_color": self.bilat_color.toPlainText(),
+            "bilat_coord": self.bilat_coord.toPlainText(),
+        }
+
+        self.previous_file_list = self.file_list
+
+        self.file_list = requests.get(
+            "http://localhost:8000/sirius/files/add_method",
+            params={
+                "files_id": self.file_list,
+                "method": "bilat",
+            },
+            json=meta
+        ).json()
+
+        self.current_image_id = self.file_list[self.current_index]
+        self.open_api_image()  # image form set image
+
+    def unstage_parametrs_func(self):
         if self.previous_file_list:
             self.file_list = self.previous_file_list
             self.current_image_id = self.file_list[self.current_index]

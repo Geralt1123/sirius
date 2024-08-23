@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import pickle
 import numpy as np
@@ -91,10 +92,10 @@ class FirstStage(QMainWindow, FirstStageUi):
 
     def add_gaus_func(self):
         """Применяет метод гауса"""
-        meta = {"gaus_core_x": self.gaus_core_x.toPlainText(),
-                "gaus_core_y": self.gaus_core_y.toPlainText(),
-                "gaus_sigma_x": self.gaus_sigma_x.toPlainText(),
-                "gaus_sigma_y": self.gaus_sigma_y.toPlainText()
+        meta = {"gaus_core_x": self.gaus_core_x.text(),
+                "gaus_core_y": self.gaus_core_y.text(),
+                "gaus_sigma_x": self.gaus_sigma_x.text(),
+                "gaus_sigma_y": self.gaus_sigma_y.text()
                 }
 
         self.previous_file_list = self.file_list
@@ -115,9 +116,9 @@ class FirstStage(QMainWindow, FirstStageUi):
         """Применяет метод эрозии"""
 
         meta = {
-            "eroz_x": self.eroz_x.toPlainText(),
-            "eroz_y": self.eroz_y.toPlainText(),
-            "eroz_iteration": self.eroz_iteration.toPlainText(),
+            "eroz_x": self.eroz_x.text(),
+            "eroz_y": self.eroz_y.text(),
+            "eroz_iteration": self.eroz_iteration.text(),
         }
 
         self.previous_file_list = self.file_list
@@ -138,9 +139,9 @@ class FirstStage(QMainWindow, FirstStageUi):
         """Применяет метод Дилатации"""
 
         meta = {
-            "dilatation_x": self.dilatation_x.toPlainText(),
-            "dilatation_y": self.dilatation_y.toPlainText(),
-            "dilatation_iteration": self.dilatation_iteration.toPlainText(),
+            "dilatation_x": self.dilatation_x.text(),
+            "dilatation_y": self.dilatation_y.text(),
+            "dilatation_iteration": self.dilatation_iteration.text(),
         }
 
         self.previous_file_list = self.file_list
@@ -161,9 +162,9 @@ class FirstStage(QMainWindow, FirstStageUi):
         """Применяет двусторонний фильтр"""
 
         meta = {
-            "bilat_d": self.bilat_d.toPlainText(),
-            "bilat_color": self.bilat_color.toPlainText(),
-            "bilat_coord": self.bilat_coord.toPlainText(),
+            "bilat_d": self.bilat_d.text(),
+            "bilat_color": self.bilat_color.text(),
+            "bilat_coord": self.bilat_coord.text(),
         }
 
         self.previous_file_list = self.file_list
@@ -232,9 +233,36 @@ class MainApp(QMainWindow):
         self.tab_widget.addTab(self.markup_window, "Разметка")
 
         self.tab_widget.currentChanged.connect(self.adjust_window_size)
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)  # Подключаем обработчик
 
         self.setWindowTitle("Image Annotation Tool")
-        self.resize(1422, 200)
+        self.resize(1600, 800)
+
+    def load_uids(self):
+        """Загружает список UID из API."""
+        try:
+            response = requests.get("http://localhost:8000/sirius/files/get_file_list")
+            if response.status_code == 200:
+                self.markup_window.uids = response.json()  # Обновляем список UID в разметке
+                self.markup_window.update_uid_combobox()  # Обновляем выпадающий список UID
+                if self.markup_window.uids:
+                    self.markup_window.current_index = 0  # Сбрасываем индекс только если список не пустой
+                    self.markup_window.get_image_by_uid(self.markup_window.uids[self.markup_window.current_index])
+                else:
+                    self.markup_window.editable_image_label.clear_markings()  # Очищаем разметку, если UID пустой
+                    logging.info("Список UID пуст, изображение не загружено.")
+            else:
+                logging.error("Ошибка при получении списка UID: %s", response.text)
+        except Exception as e:
+            logging.error("Ошибка при отправке запроса на получение списка UID: %s", e)
+
+    def on_tab_changed(self, index):
+        """Обработчик изменения вкладки."""
+        try:
+            if index == 1:  # Если выбрана вкладка "Разметка"
+                self.load_uids()  # Получаем список UID
+        except Exception as e:
+            logging.error("Ошибка при переключении на вкладку 'Разметка': %s", e)
 
     def get_tab_styles(self):
         return """

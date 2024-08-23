@@ -7,7 +7,7 @@ import requests
 import cv2
 import numpy as np
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage, QIcon, QPen
+from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage, QIcon, QPen, QCursor
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, \
     QFileDialog, QComboBox
 
@@ -22,26 +22,70 @@ logging.basicConfig(level=logging.DEBUG,
                     ])
 
 
+class Magnifier(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFixedSize(100, 100)  # Размер лупы
+        self.setVisible(False)  # Изначально лупа невидима
+
+    def update_magnifier(self, image, pos):
+        """Обновляет содержимое лупы."""
+        if image.isNull():
+            return
+
+        # Получаем координаты для лупы
+        x, y = pos.x() - 25, pos.y() - 25
+
+        # Извлекаем область изображения для лупы
+        magnified_area = image.copy(x, y, 100, 100)  # Копируем область 100x100
+
+        # Увеличиваем изображение
+        pixmap = magnified_area.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio)
+
+        # Создаем временный QImage для рисования рамки
+        temp_image = QImage(pixmap.size(), QImage.Format.Format_ARGB32)
+        temp_image.fill(QColor(0, 0, 0, 0))  # Заполняем прозрачным цветом
+
+        painter = QPainter(temp_image)
+        painter.drawPixmap(0, 0, pixmap)  # Рисуем увеличенное изображение
+
+        # Рисуем рамку
+        pen = QPen(QColor(0, 0, 0, 150))  # Черная рамка с небольшой прозрачностью
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.drawRect(0, 0, pixmap.width() - 1, pixmap.height() - 1)  # Рисуем рамку вокруг изображения
+
+        painter.end()
+
+        self.setPixmap(QPixmap.fromImage(temp_image))  # Устанавливаем изображение с рамкой
+        self.move(QCursor.pos())  # Перемещаем лупу к курсору
+        self.setVisible(True)  # Делаем лупу видимой
+
+
 class ImageLabel(QLabel):
     def __init__(self, editable=False):
         super().__init__()
         self.setMouseTracking(True)
         self.start_point = None
         self.end_point = None
-        self.offset_x = 0  # Смещение по оси X
-        self.image = QPixmap()  # Здесь будет храниться изображение
-        self.markings = []  # Список для хранения разметок
-        self.removed_markings = []  # Список для хранения удаленных разметок
-        self.current_class = None  # Текущий выбранный класс
-        self.current_color = QColor(255, 0, 0)  # Цвет разметки по умолчанию на красный
-        self.fragment_width = 1024  # Ширина фрагмента
-        self.fragment_height = 128  # Высота фрагмента
-        self.fragment_index = 0  # Индекс текущего фрагмента
-        self.image_data = None  # Полное изображение в виде numpy массива
-        self.editable = editable  # Флаг для редактируемого слоя
+        self.offset_x = 0
+        self.image = QPixmap()
+        self.markings_dict = {}  # Словарь для хранения разметки по uid
+        self.removed_markings = []
+        self.current_class = None
+        self.current_color = QColor(255, 0, 0)
+        self.fragment_width = 1024
+        self.fragment_height = 128
+        self.fragment_index = 0
+        self.image_data = None
+        self.editable = editable
+        self.current_uid = None  # Добавляем переменную для хранения текущего uid
 
-        # # Устанавливаем фиксированный размер для ImageLabel
-        # self.setFixedSize(self.fragment_width, self.fragment_height)
+        # Создаем экземпляр лупы
+        self.magnifier = Magnifier(self)
+        self.right_mouse_pressed = False  # Флаг для отслеживания состояния правой кнопки мыши
 
     def set_image(self, pixmap):
         self.image = pixmap
@@ -85,6 +129,9 @@ class ImageLabel(QLabel):
         q_image = QImage(rgb_image.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
 
         pixmap = QPixmap.fromImage(q_image)
+
+        # Устанавливаем фиксированные размеры для отображения
+        pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
         self.set_image(pixmap)
 
         # Обновляем отображение разметки для текущего фрагмента
@@ -103,37 +150,55 @@ class ImageLabel(QLabel):
             self.display_fragment()  # Отображаем новый фрагмент
 
     def mousePressEvent(self, event):
-        if self.editable and event.button() == Qt.MouseButton.LeftButton and self.current_class is not None:
-            real_x = event.pos().x() - self.offset_x
-            real_y = event.pos().y()
-            self.start_point = (real_x, real_y)
-            logging.debug("Начальная точка: %s", self.start_point)
+        if event.button() == Qt.MouseButton.RightButton:
+            self.right_mouse_pressed = True  # Устанавливаем флаг при нажатии ПКМ
+            self.magnifier.update_magnifier(self.image, event.pos())  # Обновляем лупу
+            self.magnifier.setVisible(True)  # Делаем лупу видимой
+        elif self.editable and event.button() == Qt.MouseButton.LeftButton:
+            if self.current_class is not None:  # Проверяем, установлен ли класс
+                real_x = event.pos().x() - self.offset_x
+                real_y = event.pos().y()
+                self.start_point = (real_x, real_y)
+                logging.debug("Начальная точка: %s", self.start_point)
 
     def mouseMoveEvent(self, event):
-        if self.editable and self.start_point is not None:
+        if self.right_mouse_pressed:  # Если ПКМ удерживается
+            self.magnifier.update_magnifier(self.image, event.pos())  # Обновляем лупу
+        elif self.editable and self.start_point is not None:
             real_x = event.pos().x() - self.offset_x
             real_y = event.pos().y()
             self.end_point = (real_x, real_y)
             self.update()
 
+            # Обновляем лупу
+            self.magnifier.update_magnifier(self.image, event.pos())
+
     def mouseReleaseEvent(self, event):
-        if self.editable and event.button() == Qt.MouseButton.LeftButton and self.start_point is not None:
+        if event.button() == Qt.MouseButton.RightButton:
+            self.right_mouse_pressed = False  # Сбрасываем флаг при отпускании ПКМ
+            self.magnifier.setVisible(False)  # Скрываем лупу
+        elif self.editable and event.button() == Qt.MouseButton.LeftButton:
             real_x = event.pos().x() - self.offset_x
             real_y = event.pos().y()
             self.end_point = (real_x, real_y)
 
             if (0 <= real_x < self.image.width()) and (0 <= real_y < self.image.height()):
-                self.markings.append({
+                # Добавляем разметку в словарь по текущему uid
+                if self.current_uid not in self.markings_dict:
+                    self.markings_dict[self.current_uid] = []
+
+                self.markings_dict[self.current_uid].append({
                     "class": self.current_class,
                     "start": {"x": self.start_point[0], "y": self.start_point[1]},
                     "end": {"x": self.end_point[0], "y": self.end_point[1]},
-                    "fragment_id": self.fragment_index
                 })
-                logging.debug("Добавлена разметка: %s", self.markings[-1])
+                logging.debug("Добавлена разметка: %s", self.markings_dict[self.current_uid][-1])
             else:
                 logging.warning("Координаты разметки выходят за пределы изображения: (%d, %d)", real_x, real_y)
 
             self.start_point = None
+            self.end_point = None  # Сбрасываем конечную точку
+            self.magnifier.setVisible(False)  # Скрываем лупу при отпускании ЛКМ
             self.update()
 
     def paintEvent(self, event):
@@ -141,8 +206,7 @@ class ImageLabel(QLabel):
 
         if not self.image.isNull():
             # Масштабируем изображение с учетом рамки
-            scaled_image = self.image.scaled(self.width() - 13, self.height() - 20,
-                                             Qt.AspectRatioMode.KeepAspectRatioByExpanding)
+            scaled_image = self.image.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatioByExpanding)
 
             # Получаем размеры рамки
             frame_rect = self.rect()
@@ -159,9 +223,9 @@ class ImageLabel(QLabel):
             self.draw_markings(painter)
 
     def draw_markings(self, painter):
-        # Логика рисования разметки
-        for marking in self.markings:
-            if marking["fragment_id"] == self.fragment_index:
+        # Логика рисования разметки для текущего uid
+        if self.current_uid in self.markings_dict:
+            for marking in self.markings_dict[self.current_uid]:
                 start_x = marking["start"]["x"]
                 start_y = marking["start"]["y"]
                 end_x = marking["end"]["x"]
@@ -192,35 +256,64 @@ class ImageLabel(QLabel):
                              real_end_x - real_start_x, real_end_y - real_start_y)
 
     def get_markings_json(self):
-        # Добавляем идентификатор фрагмента в разметку
-        for marking in self.markings:
-            marking["fragment_id"] = self.fragment_index
-        return json.dumps(self.markings, ensure_ascii=False, indent=4)
+        # Возвращаем разметку только для текущего uid
+        if self.current_uid in self.markings_dict:
+            # Добавляем uid к каждому элементу разметки
+            markings_with_uid = [
+                {**marking, "uid": self.current_uid} for marking in self.markings_dict[self.current_uid]
+            ]
+            return json.dumps(markings_with_uid, ensure_ascii=False, indent=4)
+        return json.dumps([], ensure_ascii=False, indent=4)
+
+    def clear_markings(self):
+        """Очистить все разметки для текущего uid."""
+        try:
+            if self.current_uid in self.markings_dict:
+                del self.markings_dict[self.current_uid]
+            self.removed_markings.clear()
+            logging.debug("Все разметки очищены для uid: %s", self.current_uid)
+            self.update()
+        except Exception as e:
+            logging.error("Ошибка при очистке разметки: %s", e)
+
+    def reset_markings(self):
+        """Сбросить всю разметку на редактируемом изображении."""
+        try:
+            self.editable_image_label.clear_markings()  # Очищаем разметку
+        except Exception as e:
+            logging.error("Ошибка при сбросе разметки: %s", e)
 
     def remove_last_marking(self):
-        if self.markings:
-            removed = self.markings.pop()
-            self.removed_markings.append(removed)  # Сохраняем удаленную разметку
-            logging.debug("Удалена последняя разметка: %s", removed)
-            self.update()
+        """Удаляет последнюю разметку для текущего uid."""
+        try:
+            if self.current_uid in self.markings_dict and self.markings_dict[self.current_uid]:
+                removed = self.markings_dict[self.current_uid].pop()  # Удаляем последнюю разметку
+                self.removed_markings.append(removed)  # Сохраняем удаленную разметку
+                logging.debug("Удалена последняя разметка: %s", removed)
+                self.update()  # Обновляем отображение
+            else:
+                logging.warning("Нет разметок для удаления.")
+        except Exception as e:
+            logging.error("Ошибка при удалении последней разметки: %s", e)
 
     def restore_last_marking(self):
-        if self.removed_markings:
-            restored = self.removed_markings.pop()
-            self.markings.append(restored)  # Восстанавливаем разметку
-            logging.debug("Восстановлена последняя разметка: %s", restored)
-            self.update()
+        """Восстанавливает последнюю удаленную разметку."""
+        try:
+            if self.removed_markings:
+                restored = self.removed_markings.pop()  # Восстанавливаем последнюю удаленную разметку
+                if self.current_uid not in self.markings_dict:
+                    self.markings_dict[self.current_uid] = []
+                self.markings_dict[self.current_uid].append(restored)  # Добавляем восстановленную разметку
+                logging.debug("Восстановлена последняя разметка: %s", restored)
+                self.update()  # Обновляем отображение
+            else:
+                logging.warning("Нет удаленных разметок для восстановления.")
+        except Exception as e:
+            logging.error("Ошибка при восстановлении последней разметки: %s", e)
 
     def set_current_class(self, class_name):
         self.current_class = class_name
         logging.debug("Выбран класс разметки: %s", class_name)
-
-    def clear_markings(self):
-        """Очистить все разметки."""
-        self.markings.clear()
-        self.removed_markings.clear()
-        logging.debug("Все разметки очищены.")
-        self.update()
 
     def load_image_from_array(self, image_array):
         """Загружает изображение из numpy массива."""
@@ -228,20 +321,18 @@ class ImageLabel(QLabel):
         self.fragment_index = 0  # Сброс индекса фрагмента
         self.display_fragment()
 
+    def set_current_uid(self, uid):
+        """Устанавливает текущий uid для разметки."""
+        self.current_uid = uid
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.uids = []  # Инициализация списка UID
+        self.current_index = 0  # Индекс текущего UID
         self.initUI()
         self.setStyleSheet(self.get_styles())
-        # Список UID
-        self.uids = [
-            "07ba511d-65ec-4c75-9d7d-5495fcb31948",
-            "0aff0357-c88c-43b8-98d5-4be94f3bdd98",
-            "1536ed9f-3584-4a8c-8c65-4edd60bd1b3b",
-            "2b6b7e2a-8d26-48b6-b0c7-e24d5b6f3138"
-        ]
-        self.current_index = 0  # Индекс текущего UID
         self.load_initial_image()  # Загружаем первое изображение
 
     def initUI(self):
@@ -368,19 +459,17 @@ class MainWindow(QMainWindow):
         ])
         right_panel.addWidget(self.class_combo_box)
 
-        # Кнопки "Сохранить", "Отметить", "Сбросить разметку"
+        # Кнопки "Отметить", "Сохранить", "Сбросить разметку"
         self.create_action_buttons(right_panel)
 
     def create_image_control_buttons(self, left_panel):
         button_layout = QHBoxLayout()
 
-        load_button = QPushButton("Загрузить изображение")
-        left_button = QPushButton("Стрелка влево")
-        right_button = QPushButton("Стрелка вправо")
+        left_button = QPushButton("⟵")
+        right_button = QPushButton("⟶")
         remove_button = QPushButton("Удалить последнюю разметку")
         restore_button = QPushButton("Восстановить последнюю разметку")
 
-        button_layout.addWidget(load_button)
         button_layout.addWidget(left_button)
         button_layout.addWidget(right_button)
         button_layout.addWidget(remove_button)
@@ -388,12 +477,30 @@ class MainWindow(QMainWindow):
 
         left_panel.addLayout(button_layout)
 
+        # Добавляем выпадающий список для выбора UID
+        self.uid_combo_box = QComboBox()
+        self.uid_combo_box.setEnabled(bool(self.uids))  # Делаем неактивным, если список пуст
+        self.uid_combo_box.addItems(self.uids)  # Заполняем выпадающий список UID
+        self.uid_combo_box.currentTextChanged.connect(self.on_uid_selected)  # Подключаем сигнал выбора
+
+        left_panel.addWidget(self.uid_combo_box)  # Добавляем выпадающий список в панель
+
         # Подключаем действия кнопок
-        load_button.clicked.connect(self.open_image)  # Загрузка изображения
         left_button.clicked.connect(lambda: self.shift_image(-1024))  # Смещение влево
         right_button.clicked.connect(lambda: self.shift_image(1024))  # Смещение вправо
         remove_button.clicked.connect(self.remove_last_marking)
         restore_button.clicked.connect(self.restore_last_marking)
+
+    def on_uid_selected(self, uid):
+        """Вызывается при выборе UID из выпадающего списка."""
+        if uid:  # Проверяем, что UID не пустой
+            self.get_image_by_uid(uid)
+
+    def update_uid_combobox(self):
+        """Обновляет выпадающий список UID."""
+        self.uid_combo_box.clear()  # Очищаем текущие элементы
+        self.uid_combo_box.addItems(self.uids)  # Добавляем новые UID
+        self.uid_combo_box.setEnabled(bool(self.uids))  # Делаем неактивным, если список пуст
 
     def create_action_buttons(self, right_panel):
         button_layout = QVBoxLayout()
@@ -426,17 +533,29 @@ class MainWindow(QMainWindow):
 
     def load_initial_image(self):
         """Загружает первое изображение при инициализации."""
-        self.get_image_by_uid(self.uids[self.current_index])
+        if self.uids:  # Проверяем, есть ли элементы в списке UID
+            self.get_image_by_uid(self.uids[self.current_index])
+        else:
+            logging.warning("Список UID пуст, изображение не может быть загружено.")
 
     def get_image_by_uid(self, uid):
         """Отправляет GET-запрос для получения изображения по UID."""
+        if not self.uids:  # Проверяем, пуст ли список UID
+            logging.warning("Список UID пуст, изображение не может быть загружено.")
+            return  # Если пустой, просто выходим из метода
+
         try:
             response = requests.get(f"http://localhost:8000/sirius/files/get_file?file_id={uid}")
             if response.status_code == 200:
                 # Преобразуем ответ в numpy массив с правильным типом данных
                 image_array = np.array(response.json(), dtype=np.uint8)  # или np.float32 в зависимости от данных
                 self.editable_image_label.load_image_from_array(image_array)
+                self.editable_image_label.set_current_uid(uid)  # Устанавливаем текущий uid
                 logging.debug("Загружено изображение с file_id: %s", uid)
+
+                # Обновляем выбранный элемент в выпадающем списке
+                self.uid_combo_box.setCurrentText(uid)
+
             else:
                 logging.error("Ошибка при получении изображения: %s", response.text)
         except Exception as e:
@@ -463,7 +582,6 @@ class MainWindow(QMainWindow):
             self.get_image_by_uid(self.uids[self.current_index])
         else:
             logging.warning("Нет предыдущего файла.")
-
 
     def mark_image(self):
         # Логика для отметки на изображении

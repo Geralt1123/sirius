@@ -15,6 +15,8 @@ class Config:
     # Цвета
     BACKGROUND_COLOR = "#151D2C"
     TEXT_COLOR = "#ffffff"
+    QLINE_TEXT_COLOR = "#151D2C"
+
     INPUT_BACKGROUND_COLOR = "#f0f0f0"
     HOVER_BORDER_COLOR = "#0078d7"
 
@@ -44,6 +46,7 @@ class Config:
     BUTTON_FONT_SIZE = 12
     LABEL_FONT_SIZE = 12
     CHECKBOX_FONT_SIZE = 12
+    GROUPBOX_TITLE_FONT_SIZE = 12
 
     # Настройки для выпадающего меню
     DROPDOWN_BORDER_RADIUS = 5

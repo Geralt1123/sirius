@@ -90,9 +90,11 @@ class GetFileListController(AsyncService):
         self,
     ):
         async with self.orm_unit_of_work as orm_uow:
-            files = await orm_uow.files.get(is_final_image=True)
+            file_list = []
+            for file in await orm_uow.files.list(is_final_image=True):
+                file_list.append(file.id)
 
-        return files
+            return file_list
 
 
 @dataclass(kw_only=True, slots=True, frozen=True)

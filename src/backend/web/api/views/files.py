@@ -33,7 +33,7 @@ async def file_get(
     return response
 
 
-@router.get(path="/get_file_list", summary="Список файлов", response_model=FileResponseModel)
+@router.get(path="/get_file_list", summary="Список файлов", response_model=FileIdsResponseModel)
 @inject
 async def get_final_file_list(
     controller: Service = Depends(Provide[FileControllerContainer.get_final_file_list_controller])

@@ -4,12 +4,15 @@ import pickle
 import numpy as np
 from PIL import Image
 from PIL.ImageQt import ImageQt
+from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QMainWindow, QApplication, QFileDialog, QTabWidget, QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QMainWindow, QApplication, QFileDialog, QTabWidget, QWidget, QVBoxLayout, QDialog, \
+    QProgressBar, QLabel
 import requests
 #from src.first_stage.first_stage import Ui_MainWindow as FirstStageUi
 from docs.first_stage import Ui_MainWindow as FirstStageUi
 from markup import MainWindow as MarkupWindow  # Импортируем класс из markup.py
+from src.first_stage.config_ui import Config
 
 
 class FirstStage(QMainWindow, FirstStageUi):
@@ -212,6 +215,48 @@ class FirstStage(QMainWindow, FirstStageUi):
 
 
 
+class LoadingScreen(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Загрузка")
+        self.setModal(True)  # Модальный диалог, блокирует взаимодействие с другими окнами
+        self.setFixedSize(300, 100)  # Фиксированный размер окна
+
+        layout = QVBoxLayout()
+        self.label = QLabel("Загрузка, пожалуйста подождите...")
+        self.label.setStyleSheet("color: white;")  # Цвет текста
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # Устанавливаем индикатор в неопределенное состояние
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #0078d7;  /* Цвет фона прогресс-бара */
+                border: 2px solid #0056a1;  /* Цвет границы */
+                border-radius: 5px;  /* Закругление углов */
+            }
+            QProgressBar::chunk {
+                background-color: #0056a1;  /* Цвет заполненной части прогресс-бара */
+                border-radius: 5px;  /* Закругление углов */
+            }
+        """)
+
+        layout.addWidget(self.label)
+        layout.addWidget(self.progress_bar)
+        self.setLayout(layout)
+
+        # Устанавливаем стиль для диалога
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #151D2C;  /* Цвет фона для диалога */
+                border: none;  /* Убираем границу */
+            }
+        """)
+
+    def show_loading(self):
+        self.show()
+
+    def hide_loading(self):
+        self.hide()
 
 class MainApp(QMainWindow):
     def __init__(self):
@@ -232,11 +277,14 @@ class MainApp(QMainWindow):
         self.tab_widget.addTab(self.first_stage, "Первый этап")
         self.tab_widget.addTab(self.markup_window, "Разметка")
 
-        self.tab_widget.currentChanged.connect(self.adjust_window_size)
-        self.tab_widget.currentChanged.connect(self.on_tab_changed)  # Подключаем обработчик
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         self.setWindowTitle("Image Annotation Tool")
         self.resize(1600, 800)
+
+        self.setMinimumSize(1500, 300)
+
+        self.loading_screen = LoadingScreen()  # Создаем экземпляр загрузочного экрана
 
     def load_uids(self):
         """Загружает список UID из API."""
@@ -255,14 +303,24 @@ class MainApp(QMainWindow):
                 logging.error("Ошибка при получении списка UID: %s", response.text)
         except Exception as e:
             logging.error("Ошибка при отправке запроса на получение списка UID: %s", e)
+        finally:
+            self.loading_screen.hide_loading()  # Скрываем загрузочный экран после завершения загрузки
 
     def on_tab_changed(self, index):
         """Обработчик изменения вкладки."""
         try:
-            if index == 1:  # Если выбрана вкладка "Разметка"
-                self.load_uids()  # Получаем список UID
+            if index == 0:  # Если выбрана вкладка "Первый этап"
+                self.resize(1600, 800)  # Устанавливаем размеры для первой вкладки
+            elif index == 1:  # Если выбрана вкладка "Разметка"
+                # Изменяем размер окна, используя только ширину и высоту
+                self.resize(Config.WINDOW_GEOMETRY[2],
+                            Config.WINDOW_GEOMETRY[3])  # Устанавливаем размеры из конфигурации
+
+                self.loading_screen.show_loading()  # Показываем загрузочный экран
+                # Используем QTimer для асинхронного вызова load_uids
+                QTimer.singleShot(100, self.load_uids)  # Задержка в 100 мс перед вызовом load_uids
         except Exception as e:
-            logging.error("Ошибка при переключении на вкладку 'Разметка': %s", e)
+            logging.error("Ошибка при переключении на вкладку: %s", e)
 
     def get_tab_styles(self):
         return """
@@ -314,13 +372,6 @@ class MainApp(QMainWindow):
                 border: none;
             }
         """
-
-    def adjust_window_size(self, index):
-        """Изменяет размер главного окна в зависимости от текущей вкладки."""
-        current_widget = self.tab_widget.widget(index)
-        if current_widget:
-            size = current_widget.sizeHint()
-            self.resize(size.width(), size.height())
 
 
 if __name__ == '__main__':

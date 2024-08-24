@@ -7,9 +7,10 @@ import requests
 import cv2
 import numpy as np
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage, QIcon, QPen, QCursor
+from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage, QIcon, QPen, QCursor, QBrush
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, \
-    QFileDialog, QComboBox
+    QFileDialog, QComboBox, QSizePolicy
+from pyqt6_plugins.examplebutton import QtWidgets
 
 from config_ui import Config
 
@@ -219,7 +220,14 @@ class ImageLabel(QLabel):
             painter = QPainter(self)
             painter.drawPixmap(x_offset, y_offset, scaled_image)
 
-            # Рисуем разметку и другие элементы, как и раньше
+            # Рисуем рамку вокруг изображения с закругленными углами
+            border_pen = QPen(QColor(0, 120, 215), 10)  # Цвет и толщина рамки
+            painter.setPen(border_pen)
+            painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))  # Без заливки
+            # Рисуем прямоугольник рамки с закругленными углами
+            painter.drawRoundedRect(x_offset, y_offset, scaled_image.width(), scaled_image.height(), 15, 15)
+
+            # Рисуем разметку и другие элементы
             self.draw_markings(painter)
 
     def draw_markings(self, painter):
@@ -357,7 +365,7 @@ class MainWindow(QMainWindow):
 
             ImageLabel {{
                 border: 5px solid #0078d7;  /* Цвет и толщина рамки */
-                border-radius: 8px;  /* Закругление углов рамки */
+                border-radius: 1px;  /* Закругление углов рамки */
                 padding: 5px;  /* Отступы внутри рамки */
             }}
 
@@ -439,6 +447,10 @@ class MainWindow(QMainWindow):
 
         # Редактируемое изображение
         self.editable_image_label = ImageLabel(editable=True)
+        self.editable_image_label.setFixedHeight(128)  # Устанавливаем фиксированную высоту
+        self.editable_image_label.setFixedWidth(1024)  # Устанавливаем фиксированную высоту
+        self.editable_image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Политика размера
         left_panel.addWidget(self.editable_image_label)
 
         # Кнопки управления изображениями
@@ -458,6 +470,8 @@ class MainWindow(QMainWindow):
             "Дефект 5: Утечки"
         ])
         right_panel.addWidget(self.class_combo_box)
+        right_panel.addSpacing(10)
+        self.class_combo_box.setFixedSize(300, 40)
 
         # Кнопки "Отметить", "Сохранить", "Сбросить разметку"
         self.create_action_buttons(right_panel)
@@ -505,12 +519,20 @@ class MainWindow(QMainWindow):
     def create_action_buttons(self, right_panel):
         button_layout = QVBoxLayout()
 
+        # Устанавливаем отступы между кнопками
+        button_layout.setContentsMargins(0, 10, 0, 10)  # (left, top, right, bottom)
+
         mark_button = QPushButton("Отметить")
+        mark_button.setFixedSize(300, 40)
         save_button = QPushButton("Сохранить")
+        save_button.setFixedSize(300, 40)
         reset_button = QPushButton("Сбросить разметку")  # Кнопка для сброса разметки
+        reset_button.setFixedSize(300, 40)
 
         button_layout.addWidget(mark_button)
+        button_layout.addSpacing(10)
         button_layout.addWidget(save_button)
+        button_layout.addSpacing(10)
         button_layout.addWidget(reset_button)  # Добавляем кнопку сброса разметки
 
         right_panel.addLayout(button_layout)
@@ -522,6 +544,10 @@ class MainWindow(QMainWindow):
 
         # Подключаем действие выбора класса
         self.class_combo_box.currentTextChanged.connect(self.set_class_from_combobox)
+
+        # Устанавливаем текущий класс разметки по умолчанию
+        default_class = self.class_combo_box.currentText()
+        self.editable_image_label.set_current_class(default_class)
 
     def open_image(self):
         try:

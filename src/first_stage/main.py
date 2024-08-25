@@ -15,206 +15,6 @@ from markup import MainWindow as MarkupWindow  # Импортируем клас
 from src.first_stage.config_ui import Config
 
 
-class FirstStage(QMainWindow, FirstStageUi):
-    file_list = []
-    current_image_id = None
-    current_index = None
-    previous_file_list = []
-
-    def __init__(self):
-        super().__init__()
-        self.setupUi(self)
-        self.open_button.clicked.connect(self.open_image)
-        self.next_button.clicked.connect(self.get_next_image)
-        self.previous_button.clicked.connect(self.get_previous_image)
-        self.add_gaus.clicked.connect(self.add_gaus_func)
-        self.add_eroz.clicked.connect(self.add_eroz_func)
-        self.add_dilatation.clicked.connect(self.add_dilatation_func)
-        self.add_bilat.clicked.connect(self.add_bilat_func)
-        self.unstage_parametrs.clicked.connect(self.unstage_parametrs_func)
-        self.save_button.clicked.connect(self.save_button_func)
-
-    def open_image(self):
-        fileName, _ = QFileDialog.getOpenFileName(self, "Open Image File", "", "*.pkl")
-        if fileName:
-            with open(Path(fileName), 'rb') as f:
-                data = pickle.load(f)
-
-        response = requests.post("http://localhost:8000/sirius/files/save_file", json=data.tolist())
-
-        self.file_list = response.json()
-        self.current_image_id = self.file_list[0]
-        self.current_index = 0
-
-        self.open_api_image()  # image form set image
-
-    def get_next_image(self):
-        if self.current_index is None:
-            return None
-
-        if self.current_index >= len(self.file_list) - 1:
-            return None
-
-        self.current_index += 1
-        self.current_image_id = self.file_list[self.current_index]
-
-        self.open_api_image()  # image form set image
-
-    def get_previous_image(self):
-        if self.current_index is None:
-            return None
-
-        if self.current_index == 0:
-            return None
-
-        self.current_index -= 1
-        self.current_image_id = self.file_list[self.current_index]
-
-        self.open_api_image()  # image form set image
-
-    def open_api_image(self):
-        """ Подтягивает необходимы для фото в форме данные"""
-        if not self.current_image_id:
-            return 0
-        self.image_name.setText(self.current_image_id)
-
-        image_array = requests.get("http://localhost:8000/sirius/files/get_file",
-                                         params={"file_id": self.current_image_id})
-        arr = np.array(image_array.json())
-        img = ImageQt(Image.fromarray(arr.astype(np.uint8)))
-        self.current_image.setPixmap(QPixmap.fromImage(img))
-
-        if self.previous_file_list:
-            image_array = requests.get("http://localhost:8000/sirius/files/get_file",
-                                       params={"file_id": self.previous_file_list[self.current_index]})
-            arr = np.array(image_array.json())
-            img = ImageQt(Image.fromarray(arr.astype(np.uint8)))
-            self.previous_image.setPixmap(QPixmap.fromImage(img))
-        else:
-            self.previous_image.clear()
-
-    def add_gaus_func(self):
-        """Применяет метод гауса"""
-        meta = {"gaus_core_x": self.gaus_core_x.text(),
-                "gaus_core_y": self.gaus_core_y.text(),
-                "gaus_sigma_x": self.gaus_sigma_x.text(),
-                "gaus_sigma_y": self.gaus_sigma_y.text()
-                }
-
-        self.previous_file_list = self.file_list
-
-        self.file_list = requests.get(
-            "http://localhost:8000/sirius/files/add_method",
-            params={
-                "files_id": self.file_list,
-                "method": "gaus",
-            },
-            json=meta
-        ).json()
-
-        self.current_image_id = self.file_list[self.current_index]
-        self.open_api_image()  # image form set image
-
-    def add_eroz_func(self):
-        """Применяет метод эрозии"""
-
-        meta = {
-            "eroz_x": self.eroz_x.text(),
-            "eroz_y": self.eroz_y.text(),
-            "eroz_iteration": self.eroz_iteration.text(),
-        }
-
-        self.previous_file_list = self.file_list
-
-        self.file_list = requests.get(
-            "http://localhost:8000/sirius/files/add_method",
-            params={
-                "files_id": self.file_list,
-                "method": "erode",
-            },
-            json=meta
-        ).json()
-
-        self.current_image_id = self.file_list[self.current_index]
-        self.open_api_image()  # image form set image
-
-    def add_dilatation_func(self):
-        """Применяет метод Дилатации"""
-
-        meta = {
-            "dilatation_x": self.dilatation_x.text(),
-            "dilatation_y": self.dilatation_y.text(),
-            "dilatation_iteration": self.dilatation_iteration.text(),
-        }
-
-        self.previous_file_list = self.file_list
-
-        self.file_list = requests.get(
-            "http://localhost:8000/sirius/files/add_method",
-            params={
-                "files_id": self.file_list,
-                "method": "dilatation",
-            },
-            json=meta
-        ).json()
-
-        self.current_image_id = self.file_list[self.current_index]
-        self.open_api_image()  # image form set image
-
-    def add_bilat_func(self):
-        """Применяет двусторонний фильтр"""
-
-        meta = {
-            "bilat_d": self.bilat_d.text(),
-            "bilat_color": self.bilat_color.text(),
-            "bilat_coord": self.bilat_coord.text(),
-        }
-
-        self.previous_file_list = self.file_list
-
-        self.file_list = requests.get(
-            "http://localhost:8000/sirius/files/add_method",
-            params={
-                "files_id": self.file_list,
-                "method": "bilat",
-            },
-            json=meta
-        ).json()
-
-        self.current_image_id = self.file_list[self.current_index]
-        self.open_api_image()  # image form set image
-
-    def unstage_parametrs_func(self):
-        if self.previous_file_list:
-            self.file_list = self.previous_file_list
-            self.current_image_id = self.file_list[self.current_index]
-            self.previous_file_list = requests.get(
-                "http://localhost:8000/sirius/files/previous_file_list",
-                params={
-                    "files_id": self.previous_file_list,
-                }
-            ).json()
-
-        self.open_api_image()  # image form set image
-
-    def save_button_func(self):
-        if self.current_image_id:
-            requests.get(
-                "http://localhost:8000/sirius/files/save_files",
-                params={
-                    "files_id": self.file_list,
-                }
-            )
-            self.current_image.clear()
-            self.previous_image.clear()
-            self.image_name.clear()
-            self.file_list = []
-            self.current_image_id = None
-            self.current_index = None
-            self.previous_file_list = []
-
-
-
 class LoadingScreen(QDialog):
     def __init__(self):
         super().__init__()
@@ -257,6 +57,225 @@ class LoadingScreen(QDialog):
 
     def hide_loading(self):
         self.hide()
+
+
+class FirstStage(QMainWindow, FirstStageUi):
+    file_list = []
+    current_image_id = None
+    current_index = None
+    previous_file_list = []
+
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        self.open_button.clicked.connect(self.open_image)
+        self.next_button.clicked.connect(self.get_next_image)
+        self.previous_button.clicked.connect(self.get_previous_image)
+        self.add_gaus.clicked.connect(self.add_gaus_func)
+        self.add_eroz.clicked.connect(self.add_eroz_func)
+        self.add_dilatation.clicked.connect(self.add_dilatation_func)
+        self.add_bilat.clicked.connect(self.add_bilat_func)
+        self.unstage_parametrs.clicked.connect(self.unstage_parametrs_func)
+        self.save_button.clicked.connect(self.save_button_func)
+
+        self.loading_screen = LoadingScreen()
+
+
+    def open_image(self):
+        fileName, _ = QFileDialog.getOpenFileName(self, "Open Image File", "", "*.pkl")
+        if fileName:
+            with open(Path(fileName), 'rb') as f:
+                data = pickle.load(f)
+        self.loading_screen.show_loading()
+        response = requests.post("http://localhost:8000/sirius/files/save_file", json=data.tolist())
+
+        self.file_list = response.json()
+        self.current_image_id = self.file_list[0]
+        self.current_index = 0
+
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def get_next_image(self):
+        self.loading_screen.show_loading()
+        if self.current_index is None:
+            return None
+
+        if self.current_index >= len(self.file_list) - 1:
+            return None
+
+        self.current_index += 1
+        self.current_image_id = self.file_list[self.current_index]
+
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def get_previous_image(self):
+        self.loading_screen.show_loading()
+        if self.current_index is None:
+            return None
+
+        if self.current_index == 0:
+            return None
+
+        self.current_index -= 1
+        self.current_image_id = self.file_list[self.current_index]
+
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def open_api_image(self):
+        """ Подтягивает необходимы для фото в форме данные"""
+        self.loading_screen.show_loading()
+        if not self.current_image_id:
+            return 0
+        self.image_name.setText(self.current_image_id)
+
+        image_array = requests.get("http://localhost:8000/sirius/files/get_file",
+                                         params={"file_id": self.current_image_id})
+        arr = np.array(image_array.json())
+        img = ImageQt(Image.fromarray(arr.astype(np.uint8)))
+        self.current_image.setPixmap(QPixmap.fromImage(img))
+
+        if self.previous_file_list:
+            image_array = requests.get("http://localhost:8000/sirius/files/get_file",
+                                       params={"file_id": self.previous_file_list[self.current_index]})
+            arr = np.array(image_array.json())
+            img = ImageQt(Image.fromarray(arr.astype(np.uint8)))
+            self.previous_image.setPixmap(QPixmap.fromImage(img))
+        else:
+            self.previous_image.clear()
+        self.loading_screen.hide_loading()
+
+    def add_gaus_func(self):
+        """Применяет метод гауса"""
+        meta = {"gaus_core_x": self.gaus_core_x.text(),
+                "gaus_core_y": self.gaus_core_y.text(),
+                "gaus_sigma_x": self.gaus_sigma_x.text(),
+                "gaus_sigma_y": self.gaus_sigma_y.text()
+                }
+
+        self.previous_file_list = self.file_list
+        self.loading_screen.show_loading()
+        self.file_list = requests.get(
+            "http://localhost:8000/sirius/files/add_method",
+            params={
+                "files_id": self.file_list,
+                "method": "gaus",
+            },
+            json=meta
+        ).json()
+
+        self.current_image_id = self.file_list[self.current_index]
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def add_eroz_func(self):
+        """Применяет метод эрозии"""
+
+        meta = {
+            "eroz_x": self.eroz_x.text(),
+            "eroz_y": self.eroz_y.text(),
+            "eroz_iteration": self.eroz_iteration.text(),
+        }
+
+        self.previous_file_list = self.file_list
+        self.loading_screen.show_loading()
+        self.file_list = requests.get(
+            "http://localhost:8000/sirius/files/add_method",
+            params={
+                "files_id": self.file_list,
+                "method": "erode",
+            },
+            json=meta
+        ).json()
+
+        self.current_image_id = self.file_list[self.current_index]
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def add_dilatation_func(self):
+        """Применяет метод Дилатации"""
+
+        meta = {
+            "dilatation_x": self.dilatation_x.text(),
+            "dilatation_y": self.dilatation_y.text(),
+            "dilatation_iteration": self.dilatation_iteration.text(),
+        }
+
+        self.previous_file_list = self.file_list
+        self.loading_screen.show_loading()
+        self.file_list = requests.get(
+            "http://localhost:8000/sirius/files/add_method",
+            params={
+                "files_id": self.file_list,
+                "method": "dilatation",
+            },
+            json=meta
+        ).json()
+
+        self.current_image_id = self.file_list[self.current_index]
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def add_bilat_func(self):
+        """Применяет двусторонний фильтр"""
+
+        meta = {
+            "bilat_d": self.bilat_d.text(),
+            "bilat_color": self.bilat_color.text(),
+            "bilat_coord": self.bilat_coord.text(),
+        }
+
+        self.previous_file_list = self.file_list
+        self.loading_screen.show_loading()
+        self.file_list = requests.get(
+            "http://localhost:8000/sirius/files/add_method",
+            params={
+                "files_id": self.file_list,
+                "method": "bilat",
+            },
+            json=meta
+        ).json()
+
+        self.current_image_id = self.file_list[self.current_index]
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def unstage_parametrs_func(self):
+        self.loading_screen.show_loading()
+        if self.previous_file_list:
+            self.file_list = self.previous_file_list
+            self.current_image_id = self.file_list[self.current_index]
+            self.previous_file_list = requests.get(
+                "http://localhost:8000/sirius/files/previous_file_list",
+                params={
+                    "files_id": self.previous_file_list,
+                }
+            ).json()
+
+        self.open_api_image()  # image form set image
+        self.loading_screen.hide_loading()
+
+    def save_button_func(self):
+        self.loading_screen.show_loading()
+        if self.current_image_id:
+            requests.get(
+                "http://localhost:8000/sirius/files/save_files",
+                params={
+                    "files_id": self.file_list,
+                }
+            )
+            self.current_image.clear()
+            self.previous_image.clear()
+            self.image_name.clear()
+            self.file_list = []
+            self.current_image_id = None
+            self.current_index = None
+            self.previous_file_list = []
+        self.loading_screen.hide_loading()
+
+
 
 class MainApp(QMainWindow):
     def __init__(self):

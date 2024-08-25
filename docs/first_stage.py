@@ -6,7 +6,6 @@ from src.first_stage.config_ui import Config
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1600, 800)
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.centralwidget.setStyleSheet(self.get_styles())

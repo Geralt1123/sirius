@@ -1,18 +1,142 @@
 import logging
+import string
 from pathlib import Path
 import pickle
+import random
+
 import numpy as np
 from PIL import Image
 from PIL.ImageQt import ImageQt
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QTime
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QMainWindow, QApplication, QFileDialog, QTabWidget, QWidget, QVBoxLayout, QDialog, \
-    QProgressBar, QLabel
+from PyQt6.QtWidgets import QMainWindow, QApplication, QFileDialog, QTabWidget, QVBoxLayout, QDialog, \
+    QProgressBar, QLabel, QLineEdit, QPushButton, QMessageBox
 import requests
-#from src.first_stage.first_stage import Ui_MainWindow as FirstStageUi
-from docs.first_stage import Ui_MainWindow as FirstStageUi
+from first_stage import Ui_MainWindow as FirstStageUi
 from markup import MainWindow as MarkupWindow  # Импортируем класс из markup.py
-from src.first_stage.config_ui import Config
+from config_ui import Config
+from detect import DetectWindow
+
+class AuthDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Авторизация")
+        self.setFixedSize(300, 250)  # Увеличиваем высоту окна для капчи
+
+        layout = QVBoxLayout()
+
+        self.label_username = QLabel("Логин:")
+        self.username_input = QLineEdit()
+        self.label_password = QLabel("Пароль:")
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)  # Скрываем ввод пароля
+
+        self.login_button = QPushButton("Войти")
+        self.cancel_button = QPushButton("Отмена")
+
+        # Устанавливаем фиксированную высоту для кнопок и полей ввода
+        self.username_input.setFixedHeight(25)
+        self.password_input.setFixedHeight(25)
+        self.login_button.setFixedHeight(30)
+        self.cancel_button.setFixedHeight(30)
+
+        layout.addWidget(self.label_username)
+        layout.addWidget(self.username_input)
+        layout.addWidget(self.label_password)
+        layout.addWidget(self.password_input)
+        layout.addWidget(self.login_button)
+        layout.addWidget(self.cancel_button)
+
+        self.setLayout(layout)
+
+        self.login_button.clicked.connect(self.check_credentials)
+        self.cancel_button.clicked.connect(self.reject)  # Закрывает окно
+
+        # Применяем стили
+        self.setStyleSheet(self.get_styles())
+
+        # Переменные для отслеживания попыток входа
+        self.attempts = 0
+        self.locked_until = None
+        self.captcha_input = None
+        self.captcha_text = ""
+
+    def get_styles(self):
+        return """
+            QDialog {
+                background-color: #151D2C;  /* Цвет фона для диалога */
+                border: none;  /* Убираем границу */
+            }
+            QLabel {
+                color: white;  /* Цвет текста для меток */
+            }
+            QLineEdit {
+                background-color: #0078d7;  /* Цвет фона для полей ввода */
+                color: white;  /* Цвет текста в полях ввода */
+                border: 1px solid #0056a1;  /* Цвет границы */
+                border-radius: 5px;  /* Закругление углов */
+                padding: 5px;  /* Отступы внутри полей ввода */
+                font-size: 12px;  /* Увеличиваем размер шрифта */
+            }
+            QPushButton {
+                background-color: #0078d7;  /* Цвет фона для кнопок */
+                color: white;  /* Цвет текста на кнопках */
+                border: none;  /* Убираем границу */
+                padding: 10px;  /* Отступы внутри кнопок */
+                border-radius: 5px;  /* Закругление углов */
+                font-size: 12px;  /* Увеличиваем размер шрифта */
+            }
+            QPushButton:hover {
+                background-color: #0056a1;  /* Цвет фона при наведении на кнопку */
+            }
+        """
+
+    def check_credentials(self):
+        if self.locked_until and QTime.currentTime() < self.locked_until:
+            QMessageBox.warning(self, "Ошибка", "Вход заблокирован. Попробуйте позже.")
+            return
+
+        username = self.username_input.text()
+        password = self.password_input.text()
+
+        if username == "admin" and password == "admin":
+            self.accept()  # Закрывает окно и возвращает QDialog.Accepted
+        else:
+            self.attempts += 1
+            if self.attempts >= 3:
+                self.locked_until = QTime.currentTime().addSecs(1200)  # Блокировка на 20 минут
+                QMessageBox.warning(self, "Ошибка", "Слишком много неправильных попыток. Попробуйте позже.")
+                self.username_input.setDisabled(True)
+                self.password_input.setDisabled(True)
+                self.login_button.setDisabled(True)
+                return
+
+            if self.attempts == 2:
+                self.show_captcha()
+
+            QMessageBox.warning(self, "Ошибка", "Неверный логин или пароль. Попробуйте снова.")
+
+    def show_captcha(self):
+        self.captcha_text = self.generate_captcha()
+        self.captcha_input = QLineEdit(self)
+        self.captcha_input.setPlaceholderText("Введите капчу: " + self.captcha_text)
+        self.layout().addWidget(self.captcha_input)
+
+    def generate_captcha(self):
+        """Генерирует простую капчу."""
+        characters = string.ascii_letters + string.digits
+        captcha = ''.join(random.choice(characters) for _ in range(6))
+        return captcha
+
+    def validate_captcha(self):
+        """Проверяет введенную капчу."""
+        if self.captcha_input and self.captcha_input.text() == self.captcha_text:
+            self.attempts = 0  # Сбрасываем попытки после успешного ввода капчи
+            self.captcha_input.clear()
+            self.captcha_input.deleteLater()
+            return True
+        return False
+
 
 
 class LoadingScreen(QDialog):
@@ -292,9 +416,11 @@ class MainApp(QMainWindow):
 
         self.first_stage = FirstStage()
         self.markup_window = MarkupWindow()
+        self.detect_window = DetectWindow()
 
-        self.tab_widget.addTab(self.first_stage, "Первый этап")
+        self.tab_widget.addTab(self.first_stage, "Преобразование")
         self.tab_widget.addTab(self.markup_window, "Разметка")
+        self.tab_widget.addTab(self.detect_window, "Распознавание")
 
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
@@ -397,6 +523,11 @@ if __name__ == '__main__':
     import sys
 
     app = QApplication(sys.argv)
-    main_window = MainApp()
-    main_window.show()
-    sys.exit(app.exec())
+
+    auth_dialog = AuthDialog()
+    if auth_dialog.exec() == QDialog.DialogCode.Accepted:
+        main_window = MainApp()
+        main_window.show()
+        sys.exit(app.exec())
+    else:
+        sys.exit()

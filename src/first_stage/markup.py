@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage, QIcon, QPen, QCursor, QBrush
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, \
     QFileDialog, QComboBox, QSizePolicy, QMessageBox
-from pyqt6_plugins.examplebutton import QtWidgets
+
 
 from config_ui import Config
 

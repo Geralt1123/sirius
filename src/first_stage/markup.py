@@ -657,7 +657,13 @@ class MainWindow(QMainWindow):
             }
 
             # Отправляем POST-запрос с file_id как параметр
-            response = requests.post(f"http://localhost:8000/create_train_data?file_id={file_id}", json=payload)
+            response = requests.post(f"http://localhost:8000/sirius/files/create_train_data?file_id={file_id}", json=json_output)
+
+            response = requests.post(
+                "http://localhost:8000/sirius/files/create_train_data",
+                params={"file_id": file_id},
+                data=json.dumps(data)
+            )
 
             if response.status_code == 200:
                 logging.info("Данные успешно сохранены на сервере.")

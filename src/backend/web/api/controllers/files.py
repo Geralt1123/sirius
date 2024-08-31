@@ -1,15 +1,17 @@
 import io
+import os
 from uuid import uuid4, UUID
 from dataclasses import dataclass
 
 import cv2
 import numpy as np
+from PIL import Image
 
 from common.exceptions import ControllerException
 from common.models.s3 import S3Model
 from common.repository import S3Repository
 from interfaces import AsyncService
-from models.orm import File, FileMetadata
+from models.orm import File, FileMetadata, TrainData
 from units_of_work import FileUnitOfWork
 
 
@@ -39,7 +41,7 @@ class UploadFileController(AsyncService):
             previous_file = None
             files = []
             for i in range(0,4):
-                tile=tiles[i]
+                tile = tiles[i]
                 file_id = uuid4()
                 s3_model = S3Model(
                     bucket_name="sirius",
@@ -234,3 +236,64 @@ class SaveFilesController(AsyncService):
                 file = await orm_uow.files.get(id=file_id)
                 file.is_final_image = True
                 await orm_uow.commit()
+
+
+@dataclass(kw_only=True, slots=True, frozen=True)
+class CreateTrainDataController(AsyncService):
+    """Создает обучающий файл"""
+
+    orm_unit_of_work: FileUnitOfWork
+    storage_repository: S3Repository
+
+    async def __call__(
+            self,
+            data: list[dict],
+            file_id: UUID,
+    ):
+        async with self.orm_unit_of_work as orm_uow:
+
+            file_bytes = self.storage_repository.get(
+                bucket_name="sirius", object_name=str(file_id)
+            )
+            #  Преобразуем в массив
+            arr_image = np.reshape(np.frombuffer(file_bytes, dtype=np.uint8), (128, 1024))
+
+            image = Image.fromarray(arr_image, 'L')
+            out_img = io.BytesIO()
+            image.save(out_img, format="png")
+            out_img.seek(0)
+            s3_model = S3Model(
+                bucket_name="sirius",
+                object_name=f"{str(file_id)}_train.jpg",
+                data=out_img,
+                length=-1,
+            )
+
+            self.storage_repository.insert(s3_model, None)
+
+            with open(f"{str(file_id)}_train.txt", "w") as file:
+                for data_row in data:
+                    x1 = data_row.get("start").get("x")/1024
+                    y1 = data_row.get("start").get("y")/128
+                    x2 = data_row.get("end").get("x")/1024
+                    y2 = data_row.get("end").get("y")/128
+                    file.writelines(f"{data_row.get('class')} {x1} {y1} {x2} {y2}\n")
+
+            with open(f"{str(file_id)}_train.txt", "rb") as file:
+                s3_model = S3Model(
+                    bucket_name="sirius",
+                    object_name=f"{str(file_id)}_train.txt",
+                    data=file,
+                    length=-1,
+                )
+                self.storage_repository.insert(s3_model, None)
+            os.remove(f"{str(file_id)}_train.txt")
+            train_data = TrainData(
+                id=uuid4(),
+                file_id=str(file_id),
+                jpg_name=f"{str(file_id)}_train.jpg",
+                marking_name=f"{str(file_id)}_train.txt"
+            )
+
+            await orm_uow.train_data.insert(train_data)
+            await orm_uow.commit()

@@ -72,3 +72,22 @@ async def save_files(
     controller: Service = Depends(Provide[FileControllerContainer.save_files_controller])
 ):
     await controller(files_id)
+
+
+@router.get(path="/cre_files", summary="Пометка изображений как финальное")
+@inject
+async def save_files(
+    files_id: list[UUID] = Query(),
+    controller: Service = Depends(Provide[FileControllerContainer.save_files_controller])
+):
+    await controller(files_id)
+
+
+@router.post(path="/create_train_data", summary="Создание обучающего файла")
+@inject
+async def create_train_data(
+    file_id: UUID = Query(),
+    data: list[dict] = Body(),
+    controller: Service = Depends(Provide[FileControllerContainer.create_train_data])
+):
+    await controller(file_id=file_id, data=data)

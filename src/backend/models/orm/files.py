@@ -4,7 +4,7 @@ from common.models.orm.base import Base
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from models.orm import FileMetadata
+    from models.orm import FileMetadata, TrainData
 
 
 class File(Base):
@@ -24,3 +24,4 @@ class File(Base):
     previous_file: Mapped[UUID] = mapped_column(nullable=True, comment="предыдущее изображение")
 
     file_metadata: Mapped["FileMetadata"] = relationship(back_populates="files", lazy="select")
+    train_data: Mapped[list["TrainData"]] = relationship(back_populates="file", lazy="select")

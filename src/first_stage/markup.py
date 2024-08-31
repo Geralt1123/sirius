@@ -9,7 +9,7 @@ import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage, QIcon, QPen, QCursor, QBrush
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, \
-    QFileDialog, QComboBox, QSizePolicy
+    QFileDialog, QComboBox, QSizePolicy, QMessageBox
 from pyqt6_plugins.examplebutton import QtWidgets
 
 from config_ui import Config
@@ -600,6 +600,16 @@ class MainWindow(QMainWindow):
             self.get_image_by_uid(self.uids[self.current_index])
         else:
             logging.warning("Нет следующего файла.")
+            self.show_info_message("Нет следующего файла.")  # Показываем сообщение
+
+    def show_info_message(self, message):
+        """Показывает модальное окно с информационным сообщением."""
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Информация")
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.addButton("Закрыть", QMessageBox.ButtonRole.AcceptRole)  # Кнопка "Закрыть"
+        msg_box.exec()  # Показываем модальное окно
 
     def get_previous_file(self):
         """Отправляет GET-запрос для получения предыдущего файла."""
@@ -655,7 +665,6 @@ class MainWindow(QMainWindow):
             file_id = self.editable_image_label.current_uid
             data = self.editable_image_label.markings_dict[file_id]
 
-
             payload = {
                 "data": data  # Отправляем только данные разметки в теле запроса
             }
@@ -668,11 +677,41 @@ class MainWindow(QMainWindow):
 
             if response.status_code == 200:
                 logging.info("Данные успешно сохранены на сервере.")
+                self.show_success_message()  # Показываем сообщение об успехе
             else:
                 logging.error("Ошибка при сохранении данных: %s", response.text)
+                self.show_error_message("Ошибка при сохранении данных: " + response.text)
 
         except Exception as e:
             logging.error("Ошибка при отправке запроса на сохранение данных: %s", e)
+            self.show_error_message("Ошибка при отправке запроса на сохранение данных.")
+
+    def show_success_message(self):
+        """Показывает модальное окно с сообщением об успешном сохранении данных."""
+        try:
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Успех")
+            msg_box.setText("Данные успешно сохранены на сервере.")
+            msg_box.setIcon(QMessageBox.Icon.Information)
+
+            # Добавляем кнопку "Далее"
+            next_button = msg_box.addButton("Далее", QMessageBox.ButtonRole.AcceptRole)
+
+            msg_box.exec()  # Показываем модальное окно
+
+            # Обработка нажатия кнопки "Далее"
+            if msg_box.clickedButton() == next_button:
+                self.get_next_file()  # Загружаем следующее изображение
+        except Exception as e:
+            logging.error("Ошибка при отображении модального окна: %s", e)
+
+    def show_error_message(self, message):
+        """Показывает модальное окно с сообщением об ошибке."""
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Ошибка")
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
+        msg_box.exec()  # Показываем модальное окно
 
     def remove_last_marking(self):
         self.editable_image_label.remove_last_marking()

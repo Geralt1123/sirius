@@ -189,7 +189,7 @@ class ImageLabel(QLabel):
                     self.markings_dict[self.current_uid] = []
 
                 self.markings_dict[self.current_uid].append({
-                    "class": self.current_class,
+                    "class": self.current_class,  # Устанавливаем текущий класс
                     "start": {"x": self.start_point[0], "y": self.start_point[1]},
                     "end": {"x": self.end_point[0], "y": self.end_point[1]},
                 })
@@ -463,11 +463,11 @@ class MainWindow(QMainWindow):
         # Выпадающий список для выбора класса
         self.class_combo_box = QComboBox()
         self.class_combo_box.addItems([
-            "Дефект 1: Коррозия",
-            "Дефект 2: Трещины",
-            "Дефект 3: Увеличение толщины",
-            "Дефект 4: Изменение цвета",
-            "Дефект 5: Утечки"
+            "Коррозия",
+            "Трещины",
+            "Увеличение толщины",
+            "Изменение цвета",
+            "Утечки"
         ])
         right_panel.addWidget(self.class_combo_box)
         right_panel.addSpacing(10)
@@ -630,34 +630,35 @@ class MainWindow(QMainWindow):
                       self.editable_image_label.markings_dict[self.editable_image_label.current_uid][-1])
 
     def save_image(self):
-        # Логика для сохранения разметки
         json_output = self.editable_image_label.get_markings_json()
         logging.debug("Сохранение разметки в формате JSON: %s", json_output)
 
-        # Получаем индекс выбранного класса
-        selected_class_index = self.class_combo_box.currentIndex()
+        class_to_index = {
+            "Коррозия": 0,
+            "Трещины": 1,
+            "Увеличение толщины": 2,
+            "Изменение цвета": 3,
+            "Утечки": 4
+        }
 
-        # Сохраняем разметку с индексом класса
         if self.editable_image_label.current_uid in self.editable_image_label.markings_dict:
             for marking in self.editable_image_label.markings_dict[self.editable_image_label.current_uid]:
-                marking["class"] = selected_class_index  # Устанавливаем индекс класса
+                class_name = marking.get("class")
+                if class_name in class_to_index:
+                    marking["class"] = class_to_index[class_name]
 
-        # Логируем сохранение разметки с индексами классов
         logging.debug("Разметка сохранена с индексами классов: %s",
                       self.editable_image_label.markings_dict[self.editable_image_label.current_uid])
 
         # Отправка POST-запроса
         try:
-            file_id = self.editable_image_label.current_uid  # Получаем текущий UID
-            data = self.editable_image_label.markings_dict[file_id]  # Получаем данные разметки
+            file_id = self.editable_image_label.current_uid
+            data = self.editable_image_label.markings_dict[file_id]
 
-            # Формируем тело запроса
+
             payload = {
                 "data": data  # Отправляем только данные разметки в теле запроса
             }
-
-            # Отправляем POST-запрос с file_id как параметр
-            response = requests.post(f"http://localhost:8000/sirius/files/create_train_data?file_id={file_id}", json=json_output)
 
             response = requests.post(
                 "http://localhost:8000/sirius/files/create_train_data",

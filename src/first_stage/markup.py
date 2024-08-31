@@ -522,7 +522,7 @@ class MainWindow(QMainWindow):
         # Устанавливаем отступы между кнопками
         button_layout.setContentsMargins(0, 10, 0, 10)  # (left, top, right, bottom)
 
-        mark_button = QPushButton("Отметить")
+        mark_button = QPushButton("Отправить")
         mark_button.setFixedSize(300, 40)
         save_button = QPushButton("Сохранить")
         save_button.setFixedSize(300, 40)
@@ -613,10 +613,38 @@ class MainWindow(QMainWindow):
         # Логика для отметки на изображении
         logging.debug("Отметка на изображении")
 
+        # Получаем индекс выбранного класса
+        selected_class_index = self.class_combo_box.currentIndex()
+
+        # Добавляем разметку с индексом класса
+        if self.editable_image_label.current_uid not in self.editable_image_label.markings_dict:
+            self.editable_image_label.markings_dict[self.editable_image_label.current_uid] = []
+
+        self.editable_image_label.markings_dict[self.editable_image_label.current_uid].append({
+            "class": selected_class_index,  # Устанавливаем индекс класса
+            "start": {"x": self.editable_image_label.start_point[0], "y": self.editable_image_label.start_point[1]},
+            "end": {"x": self.editable_image_label.end_point[0], "y": self.editable_image_label.end_point[1]},
+        })
+
+        logging.debug("Добавлена разметка: %s",
+                      self.editable_image_label.markings_dict[self.editable_image_label.current_uid][-1])
+
     def save_image(self):
         # Логика для сохранения разметки
         json_output = self.editable_image_label.get_markings_json()
         logging.debug("Сохранение разметки в формате JSON: %s", json_output)
+
+        # Получаем индекс выбранного класса
+        selected_class_index = self.class_combo_box.currentIndex()
+
+        # Сохраняем разметку с индексом класса
+        if self.editable_image_label.current_uid in self.editable_image_label.markings_dict:
+            for marking in self.editable_image_label.markings_dict[self.editable_image_label.current_uid]:
+                marking["class"] = selected_class_index  # Устанавливаем индекс класса
+
+        # Логируем сохранение разметки с индексами классов
+        logging.debug("Разметка сохранена с индексами классов: %s",
+                      self.editable_image_label.markings_dict[self.editable_image_label.current_uid])
 
     def remove_last_marking(self):
         self.editable_image_label.remove_last_marking()

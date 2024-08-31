@@ -646,6 +646,27 @@ class MainWindow(QMainWindow):
         logging.debug("Разметка сохранена с индексами классов: %s",
                       self.editable_image_label.markings_dict[self.editable_image_label.current_uid])
 
+        # Отправка POST-запроса
+        try:
+            file_id = self.editable_image_label.current_uid  # Получаем текущий UID
+            data = self.editable_image_label.markings_dict[file_id]  # Получаем данные разметки
+
+            # Формируем тело запроса
+            payload = {
+                "data": data  # Отправляем только данные разметки в теле запроса
+            }
+
+            # Отправляем POST-запрос с file_id как параметр
+            response = requests.post(f"http://localhost:8000/create_train_data?file_id={file_id}", json=payload)
+
+            if response.status_code == 200:
+                logging.info("Данные успешно сохранены на сервере.")
+            else:
+                logging.error("Ошибка при сохранении данных: %s", response.text)
+
+        except Exception as e:
+            logging.error("Ошибка при отправке запроса на сохранение данных: %s", e)
+
     def remove_last_marking(self):
         self.editable_image_label.remove_last_marking()
 

@@ -11,6 +11,7 @@ from PyQt6.QtCore import QTimer, QTime
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QMainWindow, QApplication, QFileDialog, QTabWidget, QVBoxLayout, QDialog, \
     QProgressBar, QLabel, QLineEdit, QPushButton, QMessageBox
+
 import requests
 from first_stage import Ui_MainWindow as FirstStageUi
 from markup import MainWindow as MarkupWindow  # Импортируем класс из markup.py
@@ -457,15 +458,31 @@ class MainApp(QMainWindow):
             if index == 0:  # Если выбрана вкладка "Первый этап"
                 self.resize(1600, 800)  # Устанавливаем размеры для первой вкладки
             elif index == 1:  # Если выбрана вкладка "Разметка"
-                # Изменяем размер окна, используя только ширину и высоту
                 self.resize(Config.WINDOW_GEOMETRY[2],
                             Config.WINDOW_GEOMETRY[3])  # Устанавливаем размеры из конфигурации
-
                 self.loading_screen.show_loading()  # Показываем загрузочный экран
-                # Используем QTimer для асинхронного вызова load_uids
                 QTimer.singleShot(100, self.load_uids)  # Задержка в 100 мс перед вызовом load_uids
+            elif index == 2:  # Если выбрана вкладка "Распознавание"
+                self.loading_screen.show_loading()  # Показываем загрузочный экран
+                QTimer.singleShot(100,
+                                  self.load_images_for_detection)  # Задержка в 100 мс перед вызовом загрузки изображений
         except Exception as e:
             logging.error("Ошибка при переключении на вкладку: %s", e)
+
+    def load_images_for_detection(self):
+        """Загружает список изображений для распознавания."""
+        try:
+            response = requests.get(
+                "http://localhost:8000/sirius/files/get_image_list")  # Эндпоинт для получения списка изображений
+            if response.status_code == 200:
+                image_list = response.json()  # Предполагается, что это список идентификаторов изображений
+                self.detect_window.load_image_list(image_list)  # Загружаем список в выпадающий список
+            else:
+                logging.error("Ошибка при получении списка изображений: %s", response.text)
+        except Exception as e:
+            logging.error("Ошибка при отправке запроса на получение списка изображений: %s", e)
+        finally:
+            self.loading_screen.hide_loading()  # Скрываем загрузочный экран после завершения загрузки
 
     def get_tab_styles(self):
         return """

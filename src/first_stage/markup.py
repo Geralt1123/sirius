@@ -524,7 +524,8 @@ class MainWindow(QMainWindow):
 
         mark_button = QPushButton("Отправить")
         mark_button.setFixedSize(300, 40)
-        save_button = QPushButton("Сохранить")
+        mark_button.setVisible(False)
+        save_button = QPushButton("Отправить")
         save_button.setFixedSize(300, 40)
         reset_button = QPushButton("Сбросить разметку")  # Кнопка для сброса разметки
         reset_button.setFixedSize(300, 40)

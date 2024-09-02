@@ -7,7 +7,7 @@ import random
 import numpy as np
 from PIL import Image
 from PIL.ImageQt import ImageQt
-from PyQt6.QtCore import QTimer, QTime
+from PyQt6.QtCore import QTimer, QTime, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QMainWindow, QApplication, QFileDialog, QTabWidget, QVBoxLayout, QDialog, \
     QProgressBar, QLabel, QLineEdit, QPushButton, QMessageBox
@@ -17,6 +17,62 @@ from first_stage import Ui_MainWindow as FirstStageUi
 from markup import MainWindow as MarkupWindow  # Импортируем класс из markup.py
 from config_ui import Config
 from detect import DetectWindow
+
+
+class ActionDialog(QDialog):
+    action_selected = pyqtSignal(str)  # Сигнал для передачи выбранного действия
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Дальнейшие действия")
+        self.setFixedSize(300, 150)
+
+        layout = QVBoxLayout()
+
+        self.label = QLabel("Выберите дальнейшие действия:")
+        self.label.setStyleSheet("color: white;")
+
+        self.manual_markup_button = QPushButton("Перейти к ручной разметке")
+        self.automatic_markup_button = QPushButton("Перейти к автоматической разметке")
+
+        layout.addWidget(self.label)
+        layout.addWidget(self.manual_markup_button)
+        layout.addWidget(self.automatic_markup_button)
+
+        self.setLayout(layout)
+
+        self.setStyleSheet(self.get_styles())
+
+        # Подключаем сигналы кнопок к методам
+        self.manual_markup_button.clicked.connect(lambda: self.select_action("manual"))
+        self.automatic_markup_button.clicked.connect(lambda: self.select_action("automatic"))
+
+    def select_action(self, action):
+        self.action_selected.emit(action)  # Излучаем сигнал с выбранным действием
+        self.accept()  # Закрываем диалог
+
+    def get_styles(self):
+        return """
+            QDialog {
+                background-color: #151D2C;  /* Цвет фона для диалога */
+                border: none;  /* Убираем границу */
+            }
+            QLabel {
+                color: white;  /* Цвет текста для меток */
+            }
+            QPushButton {
+                background-color: #0078d7;  /* Цвет фона для кнопок */
+                color: white;  /* Цвет текста на кнопках */
+                border: none;  /* Убираем границу */
+                padding: 10px;  /* Отступы внутри кнопок */
+                border-radius: 5px;  /* Закругление углов */
+                font-size: 12px;  /* Увеличиваем размер шрифта */
+            }
+            QPushButton:hover {
+                background-color: #0056a1;  /* Цвет фона при наведении на кнопку */
+            }
+        """
+
 
 class AuthDialog(QDialog):
     def __init__(self):
@@ -139,7 +195,6 @@ class AuthDialog(QDialog):
         return False
 
 
-
 class LoadingScreen(QDialog):
     def __init__(self):
         super().__init__()
@@ -179,6 +234,8 @@ class LoadingScreen(QDialog):
 
     def show_loading(self):
         self.show()
+        self.raise_()  # Поднимаем окно на передний план
+        self.activateWindow()  # Активируем окно
 
     def hide_loading(self):
         self.hide()
@@ -205,13 +262,13 @@ class FirstStage(QMainWindow, FirstStageUi):
 
         self.loading_screen = LoadingScreen()
 
-
     def open_image(self):
+        self.loading_screen.show_loading()
         fileName, _ = QFileDialog.getOpenFileName(self, "Open Image File", "", "*.pkl")
         if fileName:
             with open(Path(fileName), 'rb') as f:
                 data = pickle.load(f)
-        self.loading_screen.show_loading()
+
         response = requests.post("http://localhost:8000/sirius/files/save_file", json=data.tolist())
 
         self.file_list = response.json()
@@ -257,7 +314,7 @@ class FirstStage(QMainWindow, FirstStageUi):
         self.image_name.setText(self.current_image_id)
 
         image_array = requests.get("http://localhost:8000/sirius/files/get_file",
-                                         params={"file_id": self.current_image_id})
+                                   params={"file_id": self.current_image_id})
         arr = np.array(image_array.json())
         img = ImageQt(Image.fromarray(arr.astype(np.uint8)))
         self.current_image.setPixmap(QPixmap.fromImage(img))
@@ -385,21 +442,44 @@ class FirstStage(QMainWindow, FirstStageUi):
     def save_button_func(self):
         self.loading_screen.show_loading()
         if self.current_image_id:
-            requests.get(
+            response = requests.get(
                 "http://localhost:8000/sirius/files/save_files",
                 params={
                     "files_id": self.file_list,
                 }
             )
-            self.current_image.clear()
-            self.previous_image.clear()
-            self.image_name.clear()
-            self.file_list = []
-            self.current_image_id = None
-            self.current_index = None
-            self.previous_file_list = []
+            if response.status_code == 200:
+                self.current_image.clear()
+                self.previous_image.clear()
+                self.image_name.clear()
+                self.file_list = []
+                self.current_image_id = None
+                self.current_index = None
+                self.previous_file_list = []
+
+                # Показать модальное окно с вопросом о дальнейших действиях
+                QTimer.singleShot(1500, self.show_action_dialog)  # Задержка 5 секунд перед показом
+
         self.loading_screen.hide_loading()
 
+    def show_action_dialog(self):
+        action_dialog = ActionDialog()
+        action_dialog.action_selected.connect(self.handle_action_selection)  # Подключаем сигнал к методу
+        action_dialog.exec()
+
+    def handle_action_selection(self, action):
+        main_app = self.get_main_app()  # Получаем экземпляр MainApp
+        if action == "manual":
+            main_app.tab_widget.setCurrentIndex(1)  # Индекс вкладки "Разметка"
+        elif action == "automatic":
+            main_app.tab_widget.setCurrentIndex(2)  # Индекс вкладки "Распознавание"
+
+    def get_main_app(self):
+        """Получает экземпляр основного приложения."""
+        for widget in QApplication.topLevelWidgets():
+            if isinstance(widget, MainApp):
+                return widget
+        return None
 
 
 class MainApp(QMainWindow):

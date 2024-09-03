@@ -1,13 +1,12 @@
 import logging
-
 import cv2
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QFileDialog, QHBoxLayout
-from PyQt6.QtGui import QPixmap, QImage
-import requests
-from PIL import Image
-from PIL.ImageQt import ImageQt
 import numpy as np
+import requests
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QFileDialog, QHBoxLayout, \
+    QSpacerItem, QSizePolicy
+
 
 class DetectWindow(QWidget):
     def __init__(self):
@@ -36,13 +35,34 @@ class DetectWindow(QWidget):
         # Добавляем кнопки в основной layout
         layout.addLayout(button_layout)
 
-        # Область для отображения изображения
+        # Область для отображения изображений
         self.image_frame = QFrame()
         self.image_frame.setStyleSheet("border: 5px solid #0078d7; border-radius: 1px;")
-        self.image_label = QLabel()
+        self.image_frame.setMinimumSize(QSize(1024, 128))  # Устанавливаем минимальные размеры рамки
+        self.image_frame.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)  # Устанавливаем фиксированный размер
+
+        # Создаем метки для изображений
+        self.image_label_1 = QLabel()
+        self.image_label_1.setMinimumSize(QSize(1024, 128))  # Устанавливаем минимальные размеры для метки
+        self.image_label_1.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Центрируем изображение
+
+        self.image_label_2 = QLabel()
+        self.image_label_2.setMinimumSize(QSize(1024, 128))  # Устанавливаем минимальные размеры для метки
+        self.image_label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Центрируем изображение
+
+        # Создаем вертикальный layout для изображений
         self.image_frame_layout = QVBoxLayout(self.image_frame)
-        self.image_frame_layout.addWidget(self.image_label)
-        layout.addWidget(self.image_frame)
+        self.image_frame_layout.addWidget(self.image_label_1)
+        self.image_frame_layout.addWidget(self.image_label_2)
+        self.image_frame_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Центрируем содержимое рамки
+
+        # Создаем горизонтальный layout для центрирования рамки
+        center_layout = QHBoxLayout()
+        center_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))  # Левый отступ
+        center_layout.addWidget(self.image_frame)
+        center_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))  # Правый отступ
+
+        layout.addLayout(center_layout)  # Добавляем центрированный layout в основной layout
 
         self.setLayout(layout)
 
@@ -52,6 +72,7 @@ class DetectWindow(QWidget):
 
         # Применяем стили
         self.setStyleSheet(self.get_styles())
+
 
     def get_styles(self):
         return """
@@ -164,7 +185,11 @@ class DetectWindow(QWidget):
 
                     # Устанавливаем фиксированные размеры для отображения
                     pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
-                    self.image_label.setPixmap(pixmap)
+                    self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
+
+                    # Для второго изображения, если нужно, можно использовать тот же массив или другой
+                    # Например, если вы хотите отобразить то же изображение, просто скопируйте его
+                    self.image_label_2.setPixmap(pixmap.copy())  # Устанавливаем второе изображение
 
                 else:
                     raise ValueError("Полученный массив не является цветным изображением.")
@@ -178,12 +203,12 @@ class DetectWindow(QWidget):
 
     def save_image(self):
         """Сохраняет текущее изображение."""
-        if self.image_label.pixmap() is not None:
+        if self.image_label_1.pixmap() is not None:
             options = QFileDialog.Options()
             file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить изображение", "", "Images (*.png *.jpg *.bmp);;All Files (*)", options=options)
             if file_name:
                 # Получаем текущее изображение и сохраняем его
-                current_pixmap = self.image_label.pixmap()
+                current_pixmap = self.image_label_1.pixmap()
                 current_pixmap.save(file_name)
         else:
             print("Нет изображения для сохранения.")

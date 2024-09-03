@@ -544,6 +544,7 @@ class MainApp(QMainWindow):
                 QTimer.singleShot(100, self.load_uids)  # Задержка в 100 мс перед вызовом load_uids
             elif index == 2:  # Если выбрана вкладка "Распознавание"
                 self.loading_screen.show_loading()  # Показываем загрузочный экран
+                self.resize(1600, 450)  # Устанавливаем размеры для первой вкладки
                 QTimer.singleShot(100,
                                   self.load_images_for_detection)  # Задержка в 100 мс перед вызовом загрузки изображений
         except Exception as e:

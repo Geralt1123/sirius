@@ -2,10 +2,54 @@ import logging
 import cv2
 import numpy as np
 import requests
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal, QThread
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QFileDialog, QHBoxLayout, \
     QSpacerItem, QSizePolicy
+
+class ImageLoader(QThread):
+    image_loaded = pyqtSignal(np.ndarray, int)  # Сигнал для передачи загруженного изображения и индекса
+
+    def __init__(self, file_id, endpoint):
+        super().__init__()
+        self.file_id = file_id
+        self.endpoint = endpoint
+
+    def run(self):
+        try:
+            # Отправка запроса на сервер для получения изображения
+            response = requests.post(self.endpoint, params={"file_id": self.file_id})
+            response.raise_for_status()  # Проверка на ошибки HTTP
+
+            # Предполагаем, что сервер возвращает массив в формате JSON
+            arr = np.array(response.json())
+
+            # Проверка, является ли полученный массив NumPy
+            if isinstance(arr, list):
+                arr = np.array(arr)  # Преобразование списка в массив NumPy
+
+            # Проверка на цветное изображение
+            if arr.ndim == 3 and arr.shape[2] in [3, 4]:  # 3 канала (RGB) или 4 канала (RGBA)
+                if arr.dtype == np.float32 or arr.dtype == np.float64:
+                    arr = (arr * 255).astype(np.uint8)  # Преобразование в uint8
+                elif arr.dtype != np.uint8:
+                    arr = arr.astype(np.uint8)  # Преобразование в uint8, если это не float
+
+                # Преобразование в RGB, если это необходимо
+                if arr.shape[2] == 4:  # RGBA
+                    arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+
+                # Отправляем сигнал с загруженным изображением
+                self.image_loaded.emit(arr, 1)  # Индекс 1 для первого изображения
+            else:
+                raise ValueError("Полученный массив не является цветным изображением.")
+
+        except requests.exceptions.RequestException as e:
+            logging.error("Ошибка при запросе к серверу: %s", e)
+        except ValueError as e:
+            logging.error("Ошибка при обработке данных: %s", e)
+        except Exception as e:
+            logging.error("Неизвестная ошибка: %s", e)
 
 
 class DetectWindow(QWidget):
@@ -149,57 +193,37 @@ class DetectWindow(QWidget):
         """Обрабатывает распознавание изображения."""
         selected_image_id = self.image_selector.currentText()
         if selected_image_id:
-            try:
-                # Отправка запроса на сервер для получения изображения
-                response = requests.post(f"http://localhost:8000/sirius/files/predict_file",
-                                         params={"file_id": selected_image_id})
-                response.raise_for_status()  # Проверка на ошибки HTTP
+            # Создаем потоки для загрузки изображений
+            self.load_image_1 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file")
+            self.load_image_2 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file_2")
 
-                # Предполагаем, что сервер возвращает массив в формате JSON
-                arr = np.array(response.json())
+            # Подключаем сигнал к слоту для обработки загруженного изображения
+            self.load_image_1.image_loaded.connect(self.display_image)
+            self.load_image_2.image_loaded.connect(self.display_image)
 
-                # Проверка, является ли полученный массив NumPy
-                if isinstance(arr, list):
-                    arr = np.array(arr)  # Преобразование списка в массив NumPy
+            # Запускаем потоки
+            self.load_image_1.start()
+            self.load_image_2.start()
 
-                # Проверка на цветное изображение
-                if arr.ndim == 3 and arr.shape[2] in [3, 4]:  # 3 канала (RGB) или 4 канала (RGBA)
-                    if arr.dtype == np.float32 or arr.dtype == np.float64:
-                        arr = (arr * 255).astype(np.uint8)  # Преобразование в uint8
-                    elif arr.dtype != np.uint8:
-                        arr = arr.astype(np.uint8)  # Преобразование в uint8, если это не float
+    def display_image(self, arr, index):
+        """Отображает изображение в соответствующем QLabel."""
+        # Получаем размеры изображения
+        height, width, channel = arr.shape
+        bytes_per_line = 3 * width
 
-                    # Преобразование в RGB, если это необходимо
-                    if arr.shape[2] == 4:  # RGBA
-                        arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+        # Создание QImage из массива
+        q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
 
-                    # Получаем размеры изображения
-                    height, width, channel = arr.shape
-                    bytes_per_line = 3 * width
+        # Создание QPixmap из QImage
+        pixmap = QPixmap.fromImage(q_image)
 
-                    # Создание QImage из массива
-                    q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+        # Устанавливаем фиксированные размеры для отображения
+        pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
 
-                    # Создание QPixmap из QImage
-                    pixmap = QPixmap.fromImage(q_image)
-
-                    # Устанавливаем фиксированные размеры для отображения
-                    pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
-                    self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
-
-                    # Для второго изображения, если нужно, можно использовать тот же массив или другой
-                    # Например, если вы хотите отобразить то же изображение, просто скопируйте его
-                    self.image_label_2.setPixmap(pixmap.copy())  # Устанавливаем второе изображение
-
-                else:
-                    raise ValueError("Полученный массив не является цветным изображением.")
-
-            except requests.exceptions.RequestException as e:
-                logging.error("Ошибка при запросе к серверу: %s", e)
-            except ValueError as e:
-                logging.error("Ошибка при обработке данных: %s", e)
-            except Exception as e:
-                logging.error("Неизвестная ошибка: %s", e)
+        if index == 1:
+            self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
+        else:
+            self.image_label_2.setPixmap(pixmap)  # Устанавливаем второе изображение
 
     def save_image(self):
         """Сохраняет текущее изображение."""

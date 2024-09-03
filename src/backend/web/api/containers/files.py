@@ -2,7 +2,7 @@ from dependency_injector import containers, providers
 from units_of_work import FileUnitOfWork
 from web.api.controllers import (UploadFileController, DownloadFileController, GetFileListController,
                                  AddFilterController, GetPreviousFileListController, SaveFilesController,
-                                 CreateTrainDataController)
+                                 CreateTrainDataController, FilePredictController)
 
 
 class FileControllerContainer(containers.DeclarativeContainer):
@@ -55,6 +55,12 @@ class FileControllerContainer(containers.DeclarativeContainer):
 
     create_train_data = providers.Factory(
         CreateTrainDataController,
+        orm_unit_of_work=file_uow,
+        storage_repository=storage.s3_repository,
+    )
+
+    file_predict_controller = providers.Factory(
+        FilePredictController,
         orm_unit_of_work=file_uow,
         storage_repository=storage.s3_repository,
     )

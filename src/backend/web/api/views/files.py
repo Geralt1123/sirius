@@ -91,3 +91,12 @@ async def create_train_data(
     controller: Service = Depends(Provide[FileControllerContainer.create_train_data])
 ):
     await controller(file_id=file_id, data=data)
+
+
+@router.post(path="/predict_file", summary="отправка файла на распознавание")
+@inject
+async def predict_file(
+    file_id: UUID = Query(),
+    controller: Service = Depends(Provide[FileControllerContainer.file_predict_controller])
+):
+    return await controller(file_id=file_id)

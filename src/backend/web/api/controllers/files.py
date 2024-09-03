@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
+import requests
 from PIL import Image
 
 from common.exceptions import ControllerException
@@ -297,3 +298,28 @@ class CreateTrainDataController(AsyncService):
 
             await orm_uow.train_data.insert(train_data)
             await orm_uow.commit()
+
+
+@dataclass(kw_only=True, slots=True, frozen=True)
+class FilePredictController(AsyncService):
+    """Создает обучающий файл"""
+
+    orm_unit_of_work: FileUnitOfWork
+    storage_repository: S3Repository
+
+    async def __call__(
+            self,
+            file_id: UUID,
+    ):
+        async with self.orm_unit_of_work as orm_uow:
+            file_bytes = self.storage_repository.get(
+                bucket_name="sirius", object_name=str(file_id)
+            )
+            #  Преобразуем в массив
+            arr_image = np.reshape(np.frombuffer(file_bytes, dtype=np.uint8), (128, 1024))
+
+            image = Image.fromarray(arr_image, 'L')
+            out_img = io.BytesIO()
+            image.save(out_img, format="png")
+            response = requests.post("http://localhost:8005/yolo/predict/predict_image", json=arr_image.tolist())
+            return response.json()

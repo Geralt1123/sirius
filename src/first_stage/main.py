@@ -350,13 +350,54 @@ class FirstStage(QMainWindow, FirstStageUi):
         img = ImageQt(Image.fromarray(arr.astype(np.uint8)))
         self.previous_image.setPixmap(QPixmap.fromImage(img))
 
-    def add_gaus_func(self): # Применяет метод Гаусса к изображению
+    def add_gaus_func(self):  # Применяет метод Гаусса к изображению
+        gaus_core_x = int(self.gaus_core_x.text())
+        gaus_core_y = int(self.gaus_core_y.text())
+
+        # Проверка на четность для ядра
+        if gaus_core_x % 2 == 0 or gaus_core_y % 2 == 0:
+            self.show_info_message("Пожалуйста, введите только нечетные числа для фильтра Гаусса.")
+            return  # Прерываем выполнение функции, если введены четные числа
+
+        # Проверка на четность для сигмы
+        try:
+            gaus_sigma_x = int(self.gaus_sigma_x.text())
+            gaus_sigma_y = int(self.gaus_sigma_y.text())
+
+            if gaus_sigma_x % 2 == 0 or gaus_sigma_y % 2 == 0:
+                self.show_info_message("Пожалуйста, введите только нечетные числа для фильтра Гаусса.")
+                return  # Прерываем выполнение функции, если введены четные числа
+        except ValueError:
+            self.show_info_message("Пожалуйста, введите корректные значения для фильтра Гаусса.")
+            return  # Прерываем выполнение функции, если введены некорректные значения
+
         self.apply_method("gaus", {
-            "gaus_core_x": self.gaus_core_x.text(),
-            "gaus_core_y": self.gaus_core_y.text(),
-            "gaus_sigma_x": self.gaus_sigma_x.text(),
-            "gaus_sigma_y": self.gaus_sigma_y.text()
+            "gaus_core_x": gaus_core_x,
+            "gaus_core_y": gaus_core_y,
+            "gaus_sigma_x": gaus_sigma_x,
+            "gaus_sigma_y": gaus_sigma_y
         })
+
+    def show_info_message(self, message):  # Метод для отображения информационного сообщения
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Информация")
+        msg_box.setText(message)
+
+        # Устанавливаем общий стиль для QMessageBox
+        msg_box.setStyleSheet(self.get_message_box_styles())
+
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
+
+    def get_message_box_styles(self):  # Возвращает стили для QMessageBox
+        return """
+            QMessageBox { background-color: #151D2C; border: none; }
+            QLabel { color: white; }
+            QPushButton {
+                background-color: #0078d7; color: white; border: none; padding: 10px; border-radius: 5px; font-size: 12px;
+            }
+            QPushButton:hover { background-color: #0056a1; }
+        """
 
     def add_eroz_func(self): # Применяет метод эрозии к изображению
         self.apply_method("erode", {

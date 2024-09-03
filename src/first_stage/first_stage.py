@@ -1,5 +1,5 @@
 from PyQt6 import QtCore, QtWidgets
-
+from PyQt6.QtGui import QIntValidator  # Импортируем QIntValidator
 from config_ui import Config
 
 
@@ -70,16 +70,20 @@ class Ui_MainWindow(object):
 
         group_layout.addWidget(QtWidgets.QLabel("Размер ядра"), 0, 0)
         self.gaus_core_x = QtWidgets.QLineEdit(parent=groupBox)
+        self.gaus_core_x.setValidator(QIntValidator(0, 100, self.gaus_core_x))  # Устанавливаем валидатор
         group_layout.addWidget(self.gaus_core_x, 0, 1)
 
         self.gaus_core_y = QtWidgets.QLineEdit(parent=groupBox)
+        self.gaus_core_y.setValidator(QIntValidator(0, 100, self.gaus_core_y))  # Устанавливаем валидатор
         group_layout.addWidget(self.gaus_core_y, 0, 2)
 
         group_layout.addWidget(QtWidgets.QLabel("Отклонение ядра"), 1, 0)
         self.gaus_sigma_x = QtWidgets.QLineEdit(parent=groupBox)
+        self.gaus_sigma_x.setValidator(QIntValidator(0, 100, self.gaus_sigma_x))  # Устанавливаем валидатор
         group_layout.addWidget(self.gaus_sigma_x, 1, 1)
 
         self.gaus_sigma_y = QtWidgets.QLineEdit(parent=groupBox)
+        self.gaus_sigma_y.setValidator(QIntValidator(0, 100, self.gaus_sigma_y))  # Устанавливаем валидатор
         group_layout.addWidget(self.gaus_sigma_y, 1, 2)
 
         self.add_gaus = QtWidgets.QPushButton("Применить", parent=groupBox)
@@ -93,13 +97,16 @@ class Ui_MainWindow(object):
 
         group_layout.addWidget(QtWidgets.QLabel("Структурный элемент"), 0, 0)
         self.eroz_x = QtWidgets.QLineEdit(parent=groupBox)
+        self.eroz_x.setValidator(QIntValidator(0, 100, self.eroz_x))  # Устанавливаем валидатор
         group_layout.addWidget(self.eroz_x, 0, 1)
 
         self.eroz_y = QtWidgets.QLineEdit(parent=groupBox)
+        self.eroz_y.setValidator(QIntValidator(0, 100, self.eroz_y))  # Устанавливаем валидатор
         group_layout.addWidget(self.eroz_y, 0, 2)
 
         group_layout.addWidget(QtWidgets.QLabel("Итерации"), 1, 0)
         self.eroz_iteration = QtWidgets.QLineEdit(parent=groupBox)
+        self.eroz_iteration.setValidator(QIntValidator(0, 100, self.eroz_iteration))  # Устанавливаем валидатор
         group_layout.addWidget(self.eroz_iteration, 1, 1, 1, 2)
 
         self.add_eroz = QtWidgets.QPushButton("Применить", parent=groupBox)
@@ -113,13 +120,16 @@ class Ui_MainWindow(object):
 
         group_layout.addWidget(QtWidgets.QLabel("Структурный элемент"), 0, 0)
         self.dilatation_x = QtWidgets.QLineEdit(parent=groupBox)
+        self.dilatation_x.setValidator(QIntValidator(0, 100, self.dilatation_x))  # Устанавливаем валидатор
         group_layout.addWidget(self.dilatation_x, 0, 1)
 
         self.dilatation_y = QtWidgets.QLineEdit(parent=groupBox)
+        self.dilatation_y.setValidator(QIntValidator(0, 100, self.dilatation_y))  # Устанавливаем валидатор
         group_layout.addWidget(self.dilatation_y, 0, 2)
 
         group_layout.addWidget(QtWidgets.QLabel("Итерации"), 1, 0)
         self.dilatation_iteration = QtWidgets.QLineEdit(parent=groupBox)
+        self.dilatation_iteration.setValidator(QIntValidator(0, 100, self.dilatation_iteration))  # Устанавливаем валидатор
         group_layout.addWidget(self.dilatation_iteration, 1, 1, 1, 2)
 
         self.add_dilatation = QtWidgets.QPushButton("Применить", parent=groupBox)
@@ -133,14 +143,17 @@ class Ui_MainWindow(object):
 
         group_layout.addWidget(QtWidgets.QLabel("Диаметр пикселя"), 0, 0)
         self.bilat_d = QtWidgets.QLineEdit(parent=groupBox)
+        self.bilat_d.setValidator(QIntValidator(0, 100, self.bilat_d))  # Устанавливаем валидатор
         group_layout.addWidget(self.bilat_d, 0, 1)
 
         group_layout.addWidget(QtWidgets.QLabel("Сигма цвета"), 1, 0)
         self.bilat_color = QtWidgets.QLineEdit(parent=groupBox)
+        self.bilat_color.setValidator(QIntValidator(0, 100, self.bilat_color))  # Устанавливаем валидатор
         group_layout.addWidget(self.bilat_color, 1, 1)
 
         group_layout.addWidget(QtWidgets.QLabel("Сигма координат"), 2, 0)
         self.bilat_coord = QtWidgets.QLineEdit(parent=groupBox)
+        self.bilat_coord.setValidator(QIntValidator(0, 100, self.bilat_coord))  # Устанавливаем валидатор
         group_layout.addWidget(self.bilat_coord, 2, 1)
 
         self.add_bilat = QtWidgets.QPushButton("Применить", parent=groupBox)

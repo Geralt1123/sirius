@@ -1,9 +1,13 @@
 import logging
+import os
 import string
 from pathlib import Path
 import pickle
 import random
 
+from PyQt6 import QtWidgets
+from cryptography.fernet import Fernet
+import bcrypt
 import numpy as np
 from PIL import Image
 from PIL.ImageQt import ImageQt
@@ -74,11 +78,12 @@ class ActionDialog(QDialog):
         """
 
 
+
 class AuthDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Авторизация")
-        self.setFixedSize(300, 250)  # Увеличиваем высоту окна для капчи
+        self.setFixedSize(300, 300)
 
         layout = QVBoxLayout()
 
@@ -86,12 +91,11 @@ class AuthDialog(QDialog):
         self.username_input = QLineEdit()
         self.label_password = QLabel("Пароль:")
         self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)  # Скрываем ввод пароля
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
 
         self.login_button = QPushButton("Войти")
         self.cancel_button = QPushButton("Отмена")
 
-        # Устанавливаем фиксированную высоту для кнопок и полей ввода
         self.username_input.setFixedHeight(25)
         self.password_input.setFixedHeight(25)
         self.login_button.setFixedHeight(30)
@@ -107,48 +111,72 @@ class AuthDialog(QDialog):
         self.setLayout(layout)
 
         self.login_button.clicked.connect(self.check_credentials)
-        self.cancel_button.clicked.connect(self.reject)  # Закрывает окно
+        self.cancel_button.clicked.connect(self.reject)
 
-        # Применяем стили
         self.setStyleSheet(self.get_styles())
 
-        # Переменные для отслеживания попыток входа
         self.attempts = 0
         self.locked_until = None
         self.captcha_input = None
         self.captcha_text = ""
 
+        # Пример хэшированного пароля для пользователя admin
+        self.stored_username = "admin"
+        self.stored_password_hash = bcrypt.hashpw("admin".encode('utf-8'), bcrypt.gensalt())
+
+        # Логирование IP-адресов
+        self.ip_attempts = {}
+        self.max_attempts_per_ip = 5  # Максимальное количество попыток входа с одного IP
+        self.block_time = 600  # Время блокировки в секундах
+
+        # Загрузка состояния из файла
+        self.load_state()
+
     def get_styles(self):
         return """
             QDialog {
-                background-color: #151D2C;  /* Цвет фона для диалога */
-                border: none;  /* Убираем границу */
+                background-color: #151D2C;
+                border: none;
             }
             QLabel {
-                color: white;  /* Цвет текста для меток */
+                color: white;
             }
             QLineEdit {
-                background-color: #0078d7;  /* Цвет фона для полей ввода */
-                color: white;  /* Цвет текста в полях ввода */
-                border: 1px solid #0056a1;  /* Цвет границы */
-                border-radius: 5px;  /* Закругление углов */
-                padding: 5px;  /* Отступы внутри полей ввода */
-                font-size: 12px;  /* Увеличиваем размер шрифта */
+                background-color: #0078d7;
+                color: white;
+                border: 1px solid #0056a1;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 12px;
             }
             QPushButton {
-                background-color: #0078d7;  /* Цвет фона для кнопок */
-                color: white;  /* Цвет текста на кнопках */
-                border: none;  /* Убираем границу */
-                padding: 10px;  /* Отступы внутри кнопок */
-                border-radius: 5px;  /* Закругление углов */
-                font-size: 12px;  /* Увеличиваем размер шрифта */
+                background-color: #0078d7;
+                color: white;
+                border: none;
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #0056a1;  /* Цвет фона при наведении на кнопку */
+                background-color: #0056a1;
             }
         """
 
+    def get_external_ip(self):
+        try:
+            return requests.get('https://api.ipify.org').text
+        except requests.RequestException:
+            return "0.0.0.0"
+
     def check_credentials(self):
+        external_ip = self.get_external_ip()
+
+        # Проверка на блокировку IP
+        if external_ip in self.ip_attempts:
+            if self.ip_attempts[external_ip]['locked_until'] and QTime.currentTime() < self.ip_attempts[external_ip]['locked_until']:
+                QMessageBox.warning(self, "Ошибка", "Вход заблокирован с этого IP. Попробуйте позже.")
+                return
+
         if self.locked_until and QTime.currentTime() < self.locked_until:
             QMessageBox.warning(self, "Ошибка", "Вход заблокирован. Попробуйте позже.")
             return
@@ -156,22 +184,35 @@ class AuthDialog(QDialog):
         username = self.username_input.text()
         password = self.password_input.text()
 
-        if username == "admin" and password == "admin":
-            self.accept()  # Закрывает окно и возвращает QDialog.Accepted
+        if self.validate_credentials(username, password):
+            self.accept()
+            # Сброс попыток входа
+            if external_ip in self.ip_attempts:
+                self.ip_attempts[external_ip]['attempts'] = 0
         else:
-            self.attempts += 1
-            if self.attempts >= 3:
-                self.locked_until = QTime.currentTime().addSecs(1200)  # Блокировка на 20 минут
+            # Увеличиваем количество попыток входа
+            if external_ip not in self.ip_attempts:
+                self.ip_attempts[external_ip] = {'attempts': 0, 'locked_until': None}
+
+            self.ip_attempts[external_ip]['attempts'] += 1
+
+            if self.ip_attempts[external_ip]['attempts'] >= self.max_attempts_per_ip:
+                self.ip_attempts[external_ip]['locked_until'] = QTime.currentTime().addSecs(self.block_time)
                 QMessageBox.warning(self, "Ошибка", "Слишком много неправильных попыток. Попробуйте позже.")
-                self.username_input.setDisabled(True)
-                self.password_input.setDisabled(True)
-                self.login_button.setDisabled(True)
+                self.save_state()  # Сохраняем состояние
                 return
 
-            if self.attempts == 2:
+            if self.ip_attempts[external_ip]['attempts'] == 3:
                 self.show_captcha()
 
             QMessageBox.warning(self, "Ошибка", "Неверный логин или пароль. Попробуйте снова.")
+
+        self.save_state()  # Сохраняем состояние после каждой попытки входа
+
+    def validate_credentials(self, username, password):
+        if username == self.stored_username:
+            return bcrypt.checkpw(password.encode('utf-8'), self.stored_password_hash)
+        return False
 
     def show_captcha(self):
         self.captcha_text = self.generate_captcha()
@@ -180,20 +221,53 @@ class AuthDialog(QDialog):
         self.layout().addWidget(self.captcha_input)
 
     def generate_captcha(self):
-        """Генерирует простую капчу."""
         characters = string.ascii_letters + string.digits
         captcha = ''.join(random.choice(characters) for _ in range(6))
         return captcha
 
     def validate_captcha(self):
-        """Проверяет введенную капчу."""
         if self.captcha_input and self.captcha_input.text() == self.captcha_text:
-            self.attempts = 0  # Сбрасываем попытки после успешного ввода капчи
+            self.attempts = 0
             self.captcha_input.clear()
             self.captcha_input.deleteLater()
             return True
         return False
 
+    def save_state(self):
+        key = os.environ.get('SECRET_KEY')
+        if key is None:
+            QMessageBox.critical(self, "Ошибка", "Не установлен SECRET_KEY.")
+            return
+        try:
+            # Сохранение состояния в файл
+            data = {
+                'ip_attempts': self.ip_attempts,
+            }
+            key = os.environ.get('SECRET_KEY').encode()
+            fernet = Fernet(key)
+            encrypted_data = fernet.encrypt(pickle.dumps(data))
+
+            with open('auth_state.pkl', 'wb') as f:
+                f.write(encrypted_data)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить состояние: {str(e)}")
+
+    def load_state(self):
+        key = os.environ.get('SECRET_KEY')
+        if key is None:
+            QMessageBox.critical(self, "Ошибка", "Не установлен SECRET_KEY.")
+            return
+        try:
+            with open('auth_state.pkl', 'rb') as f:
+                encrypted_data = f.read()
+                key = os.environ.get('SECRET_KEY').encode()
+                fernet = Fernet(key)
+                data = pickle.loads(fernet.decrypt(encrypted_data))
+                self.ip_attempts = data.get('ip_attempts', {})
+        except FileNotFoundError:
+            self.ip_attempts = {}
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить состояние: {str(e)}")
 
 class LoadingScreen(QDialog):
     def __init__(self):
@@ -331,11 +405,31 @@ class FirstStage(QMainWindow, FirstStageUi):
 
     def add_gaus_func(self):
         """Применяет метод гауса"""
-        meta = {"gaus_core_x": self.gaus_core_x.text(),
-                "gaus_core_y": self.gaus_core_y.text(),
-                "gaus_sigma_x": self.gaus_sigma_x.text(),
-                "gaus_sigma_y": self.gaus_sigma_y.text()
-                }
+        # Получаем значения из полей ввода
+        gaus_core_x = self.gaus_core_x.text()
+        gaus_core_y = self.gaus_core_y.text()
+        gaus_sigma_x = self.gaus_sigma_x.text()
+        gaus_sigma_y = self.gaus_sigma_y.text()
+
+        # Проверяем, являются ли введённые значения нечётными
+        if (int(gaus_core_x) % 2 == 0 or int(gaus_core_y) % 2 == 0 or
+                int(gaus_sigma_x) % 2 == 0 or int(gaus_sigma_y) % 2 == 0):
+            # Если хотя бы одно значение чётное, показываем сообщение об ошибке
+            QtWidgets.QMessageBox.warning(
+                self.centralwidget,
+                "Ошибка ввода",
+                "Пожалуйста, используйте только нечётные числа.",
+                QtWidgets.QMessageBox.StandardButton.Ok
+            )
+            return  # Выходим из функции, не выполняя дальнейшие действия
+
+        # Если все значения нечётные, продолжаем выполнение
+        meta = {
+            "gaus_core_x": gaus_core_x,
+            "gaus_core_y": gaus_core_y,
+            "gaus_sigma_x": gaus_sigma_x,
+            "gaus_sigma_y": gaus_sigma_y
+        }
 
         self.previous_file_list = self.file_list
         self.loading_screen.show_loading()

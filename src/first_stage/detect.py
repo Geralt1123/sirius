@@ -195,7 +195,7 @@ class DetectWindow(QWidget):
         if selected_image_id:
             # Создаем потоки для загрузки изображений
             self.load_image_1 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file")
-            self.load_image_2 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file_2")
+            self.load_image_2 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file")
 
             # Подключаем сигнал к слоту для обработки загруженного изображения
             self.load_image_1.image_loaded.connect(self.display_image)
@@ -205,7 +205,7 @@ class DetectWindow(QWidget):
             self.load_image_1.start()
             self.load_image_2.start()
 
-    def display_image(self, arr, index):
+    def display_image(self, arr):
         """Отображает изображение в соответствующем QLabel."""
         # Получаем размеры изображения
         height, width, channel = arr.shape
@@ -220,10 +220,9 @@ class DetectWindow(QWidget):
         # Устанавливаем фиксированные размеры для отображения
         pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
 
-        if index == 1:
-            self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
-        else:
-            self.image_label_2.setPixmap(pixmap)  # Устанавливаем второе изображение
+        self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
+        self.image_label_2.setPixmap(pixmap)  # Устанавливаем второе изображение
+
 
     def save_image(self):
         """Сохраняет текущее изображение."""

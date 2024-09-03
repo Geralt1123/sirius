@@ -553,7 +553,7 @@ class MainApp(QMainWindow):
         """Загружает список изображений для распознавания."""
         try:
             response = requests.get(
-                "http://localhost:8000/sirius/files/get_image_list")  # Эндпоинт для получения списка изображений
+                "http://localhost:8000/sirius/files/get_file_list")  # Эндпоинт для получения списка изображений
             if response.status_code == 200:
                 image_list = response.json()  # Предполагается, что это список идентификаторов изображений
                 self.detect_window.load_image_list(image_list)  # Загружаем список в выпадающий список

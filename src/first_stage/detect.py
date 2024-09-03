@@ -1,5 +1,9 @@
+import logging
+
+import cv2
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QFileDialog, QHBoxLayout
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QImage
 import requests
 from PIL import Image
 from PIL.ImageQt import ImageQt
@@ -103,6 +107,7 @@ class DetectWindow(QWidget):
                 background-color: #151D2C;  /* Цвет фона для выпадающего списка */
                 color: white;  /* Цвет текста в выпадающем списке */
                 border: 1px solid #0056a1;  /* Цвет границы */
+                outline: none;
             }
 
             QComboBox QAbstractItemView::item {
@@ -123,14 +128,53 @@ class DetectWindow(QWidget):
         """Обрабатывает распознавание изображения."""
         selected_image_id = self.image_selector.currentText()
         if selected_image_id:
-            # Здесь вы можете добавить код для отправки запроса на сервер для распознавания
-            response = requests.get(f"http://localhost:8000/sirius/files/get_file", params={"file_id": selected_image_id})
-            if response.status_code == 200:
+            try:
+                # Отправка запроса на сервер для получения изображения
+                response = requests.post(f"http://localhost:8000/sirius/files/predict_file",
+                                         params={"file_id": selected_image_id})
+                response.raise_for_status()  # Проверка на ошибки HTTP
+
+                # Предполагаем, что сервер возвращает массив в формате JSON
                 arr = np.array(response.json())
-                img = ImageQt(Image.fromarray(arr.astype(np.uint8)))
-                self.image_label.setPixmap(QPixmap.fromImage(img))
-            else:
-                print("Ошибка при получении изображения:", response.text)
+
+                # Проверка, является ли полученный массив NumPy
+                if isinstance(arr, list):
+                    arr = np.array(arr)  # Преобразование списка в массив NumPy
+
+                # Проверка на цветное изображение
+                if arr.ndim == 3 and arr.shape[2] in [3, 4]:  # 3 канала (RGB) или 4 канала (RGBA)
+                    if arr.dtype == np.float32 or arr.dtype == np.float64:
+                        arr = (arr * 255).astype(np.uint8)  # Преобразование в uint8
+                    elif arr.dtype != np.uint8:
+                        arr = arr.astype(np.uint8)  # Преобразование в uint8, если это не float
+
+                    # Преобразование в RGB, если это необходимо
+                    if arr.shape[2] == 4:  # RGBA
+                        arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+
+                    # Получаем размеры изображения
+                    height, width, channel = arr.shape
+                    bytes_per_line = 3 * width
+
+                    # Создание QImage из массива
+                    q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+
+                    # Создание QPixmap из QImage
+                    pixmap = QPixmap.fromImage(q_image)
+
+                    # Устанавливаем фиксированные размеры для отображения
+                    pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
+                    self.image_label.setPixmap(pixmap)
+
+                else:
+                    raise ValueError("Полученный массив не является цветным изображением.")
+
+            except requests.exceptions.RequestException as e:
+                logging.error("Ошибка при запросе к серверу: %s", e)
+            except ValueError as e:
+                logging.error("Ошибка при обработке данных: %s", e)
+            except Exception as e:
+                logging.error("Неизвестная ошибка: %s", e)
 
     def save_image(self):
         """Сохраняет текущее изображение."""

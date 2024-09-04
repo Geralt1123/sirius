@@ -3,7 +3,6 @@ import os
 from uuid import uuid4, UUID
 from dataclasses import dataclass
 
-import cv2
 import numpy as np
 import requests
 from PIL import Image
@@ -14,6 +13,7 @@ from common.repository import S3Repository
 from interfaces import AsyncService
 from models.orm import File, FileMetadata, TrainData
 from units_of_work import FileUnitOfWork
+import cv2
 
 
 @dataclass(kw_only=True, slots=True, frozen=True)
@@ -302,7 +302,7 @@ class CreateTrainDataController(AsyncService):
 
 @dataclass(kw_only=True, slots=True, frozen=True)
 class FilePredictController(AsyncService):
-    """Создает обучающий файл"""
+    """Контроллер отправки на распрознавание изображения"""
 
     orm_unit_of_work: FileUnitOfWork
     storage_repository: S3Repository
@@ -318,8 +318,27 @@ class FilePredictController(AsyncService):
             #  Преобразуем в массив
             arr_image = np.reshape(np.frombuffer(file_bytes, dtype=np.uint8), (128, 1024))
 
-            image = Image.fromarray(arr_image, 'L')
-            out_img = io.BytesIO()
-            image.save(out_img, format="png")
             response = requests.post("http://localhost:8005/yolo/predict/predict_image", json=arr_image.tolist())
+            return response.json()
+
+
+@dataclass(kw_only=True, slots=True, frozen=True)
+class FilePredictControllerTwo(AsyncService):
+    """Контроллер отправки на распрознавание изображения"""
+
+    orm_unit_of_work: FileUnitOfWork
+    storage_repository: S3Repository
+
+    async def __call__(
+            self,
+            file_id: UUID,
+    ):
+        async with self.orm_unit_of_work as orm_uow:
+            file_bytes = self.storage_repository.get(
+                bucket_name="sirius", object_name=str(file_id)
+            )
+            #  Преобразуем в массив
+            arr_image = np.reshape(np.frombuffer(file_bytes, dtype=np.uint8), (128, 1024))
+
+            response = requests.post("http://localhost:8005/yolo/predict/predict_image_2", json=arr_image.tolist())
             return response.json()

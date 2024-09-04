@@ -1,6 +1,6 @@
 from web.api.controllers.files import UploadFileController, DownloadFileController, GetFileListController, \
     AddFilterController, GetPreviousFileListController, SaveFilesController, CreateTrainDataController, \
-    FilePredictController
+    FilePredictController, FilePredictControllerTwo
 
 __all__ = (
     "UploadFileController",
@@ -11,4 +11,5 @@ __all__ = (
     "SaveFilesController",
     "CreateTrainDataController",
     "FilePredictController",
+    "FilePredictControllerTwo",
 )

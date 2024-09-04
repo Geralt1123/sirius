@@ -2,11 +2,11 @@ from dependency_injector import containers, providers
 from units_of_work import FileUnitOfWork
 from web.api.controllers import (UploadFileController, DownloadFileController, GetFileListController,
                                  AddFilterController, GetPreviousFileListController, SaveFilesController,
-                                 CreateTrainDataController, FilePredictController)
+                                 CreateTrainDataController, FilePredictController, FilePredictControllerTwo)
 
 
 class FileControllerContainer(containers.DeclarativeContainer):
-    """Заранее сконфигурированный контейнер для экспорта в Excel"""
+    """Заранее сконфигурированный контейнер"""
 
     config = providers.Configuration()
     database = providers.DependenciesContainer()
@@ -60,6 +60,12 @@ class FileControllerContainer(containers.DeclarativeContainer):
     )
 
     file_predict_controller = providers.Factory(
+        FilePredictController,
+        orm_unit_of_work=file_uow,
+        storage_repository=storage.s3_repository,
+    )
+
+    file_predict_controller_2 = providers.Factory(
         FilePredictController,
         orm_unit_of_work=file_uow,
         storage_repository=storage.s3_repository,

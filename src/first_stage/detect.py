@@ -5,7 +5,7 @@ import requests
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QThread
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QFileDialog, QHBoxLayout, \
-    QSpacerItem, QSizePolicy, QMessageBox, QTextEdit
+    QSizePolicy, QMessageBox, QTextEdit
 
 
 class ImageLoader(QThread):
@@ -15,6 +15,7 @@ class ImageLoader(QThread):
         super().__init__()
         self.file_id = file_id
         self.endpoint = endpoint
+        self.response_data = None  # Новый атрибут для хранения ответа
 
     def run(self):
         try:
@@ -22,8 +23,11 @@ class ImageLoader(QThread):
             response = requests.post(self.endpoint, params={"file_id": self.file_id})
             response.raise_for_status()  # Проверка на ошибки HTTP
 
-            # Предполагаем, что сервер возвращает массив в формате JSON
-            arr = np.array(response.json())
+            # Сохраняем ответ в атрибуте
+            self.response_data = response.json()
+
+            # Извлекаем массив изображения
+            arr = np.array(self.response_data["image"])
 
             # Проверка, является ли полученный массив NumPy
             if isinstance(arr, list):
@@ -86,12 +90,12 @@ class DetectWindow(QWidget):
         # Создаем текстовые поля
         self.output_log_left = QTextEdit()
         self.output_log_left.setReadOnly(True)
-        self.output_log_left.setPlaceholderText("Результаты распознаваниия")
+        self.output_log_left.setPlaceholderText("Результаты распознавания")
         self.output_log_left.setStyleSheet(self.get_styles())  # Применяем стили
 
         self.output_log_right = QTextEdit()
         self.output_log_right.setReadOnly(True)
-        self.output_log_right.setPlaceholderText("Результаты распознаваниия")
+        self.output_log_right.setPlaceholderText("Результаты распознавания")
         self.output_log_right.setStyleSheet(self.get_styles())  # Применяем стили
 
         # Добавляем текстовые поля в левый и правый layout
@@ -137,9 +141,6 @@ class DetectWindow(QWidget):
 
         # Применяем стили
         self.setStyleSheet(self.get_styles())
-
-        # Загрузка данных в текстовые поля
-        self.load_text_data()
 
     def get_styles(self):
         return """
@@ -216,21 +217,6 @@ class DetectWindow(QWidget):
             }
         """
 
-    def load_text_data(self):
-        """Загружает текстовые данные из эндпоинта."""
-        try:
-            response = requests.get("http://localhost:8000/sirius/files/text")
-            response.raise_for_status()  # Проверка на ошибки HTTP
-            text_data = response.json()  # Предполагаем, что сервер возвращает данные в формате JSON
-
-            # Заполнение текстовых полей
-            self.output_log_left.setPlainText(text_data.get("left", ""))
-            self.output_log_right.setPlainText(text_data.get("right", ""))
-        except requests.exceptions.RequestException as e:
-            logging.error("Ошибка при запросе к серверу: %s", e)
-        except Exception as e:
-            logging.error("Неизвестная ошибка: %s", e)
-
     def load_image_list(self, image_list):
         """Загружает список изображений в выпадающий список."""
         self.image_selector.clear()
@@ -242,22 +228,18 @@ class DetectWindow(QWidget):
         if selected_image_id:
             # Создаем потоки для загрузки изображений
             self.load_image_1 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file")
-            self.load_image_2 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file")
+            self.load_image_2 = ImageLoader(selected_image_id, "http://localhost:8000/sirius/files/predict_file_2")
 
             # Подключаем сигнал к слоту для обработки загруженного изображения
-            self.load_image_1.image_loaded.connect(self.display_image)
-            self.load_image_2.image_loaded.connect(self.display_image)
-
-            # # Заполнение текстовых полей
-            # self.output_log_left.setPlainText(text_data.get("left", ""))
-            # self.output_log_right.setPlainText(text_data.get("right", ""))
+            self.load_image_1.image_loaded.connect(self.display_image_1)
+            self.load_image_2.image_loaded.connect(self.display_image_2)
 
             # Запускаем потоки
             self.load_image_1.start()
             self.load_image_2.start()
 
-    def display_image(self, arr):
-        """Отображает изображение в соответствующем QLabel."""
+    def display_image_1(self, arr):
+        """Отображает первое изображение и заполняет текстовое поле для него."""
         # Получаем размеры изображения
         height, width, channel = arr.shape
         bytes_per_line = 3 * width
@@ -272,7 +254,35 @@ class DetectWindow(QWidget):
         pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
 
         self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
+
+        # Заполняем текстовое поле для первого изображения
+        self.fill_text_field(self.load_image_1.response_data, self.output_log_left)
+
+    def display_image_2(self, arr):
+        """Отображает второе изображение и заполняет текстовое поле для него."""
+        # Получаем размеры изображения
+        height, width, channel = arr.shape
+        bytes_per_line = 3 * width
+
+        # Создание QImage из массива
+        q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+
+        # Создание QPixmap из QImage
+        pixmap = QPixmap.fromImage(q_image)
+
+        # Устанавливаем фиксированные размеры для отображения
+        pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
+
         self.image_label_2.setPixmap(pixmap)  # Устанавливаем второе изображение
+
+        # Заполняем текстовое поле для второго изображения
+        self.fill_text_field(self.load_image_2.response_data, self.output_log_right)
+
+    def fill_text_field(self, response_data, text_edit):
+        """Заполняет текстовое поле данными из ответа."""
+        if response_data:
+            defects_info = {"defects": response_data.get("defects", 0)}
+            text_edit.setPlainText(str(defects_info))
 
     def show_error_message(self, message):
         """Отображает модальное окно с сообщением об ошибке."""

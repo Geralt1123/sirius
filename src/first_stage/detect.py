@@ -5,7 +5,7 @@ import requests
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QThread
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QFileDialog, QHBoxLayout, \
-    QSpacerItem, QSizePolicy, QMessageBox
+    QSpacerItem, QSizePolicy, QMessageBox, QTextEdit
 
 
 class ImageLoader(QThread):
@@ -80,6 +80,27 @@ class DetectWindow(QWidget):
         # Добавляем кнопки в основной layout
         layout.addLayout(button_layout)
 
+        # Создаем горизонтальный layout для размещения текстовых полей и области изображений
+        main_layout = QHBoxLayout()
+
+        # Создаем текстовые поля
+        self.output_log_left = QTextEdit()
+        self.output_log_left.setReadOnly(True)
+        self.output_log_left.setPlaceholderText("Результаты распознаваниия")
+        self.output_log_left.setStyleSheet(self.get_styles())  # Применяем стили
+
+        self.output_log_right = QTextEdit()
+        self.output_log_right.setReadOnly(True)
+        self.output_log_right.setPlaceholderText("Результаты распознаваниия")
+        self.output_log_right.setStyleSheet(self.get_styles())  # Применяем стили
+
+        # Добавляем текстовые поля в левый и правый layout
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self.output_log_left)
+
+        right_layout = QVBoxLayout()
+        right_layout.addWidget(self.output_log_right)
+
         # Область для отображения изображений
         self.image_frame = QFrame()
         self.image_frame.setStyleSheet("border: 5px solid #0078d7; border-radius: 1px;")
@@ -101,13 +122,12 @@ class DetectWindow(QWidget):
         self.image_frame_layout.addWidget(self.image_label_2)
         self.image_frame_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Центрируем содержимое рамки
 
-        # Создаем горизонтальный layout для центрирования рамки
-        center_layout = QHBoxLayout()
-        center_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))  # Левый отступ
-        center_layout.addWidget(self.image_frame)
-        center_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))  # Правый отступ
+        # Добавляем текстовые поля и область изображений в общий layout
+        main_layout.addLayout(left_layout)  # Левый layout
+        main_layout.addWidget(self.image_frame)  # Область изображений
+        main_layout.addLayout(right_layout)  # Правый layout
 
-        layout.addLayout(center_layout)  # Добавляем центрированный layout в основной layout
+        layout.addLayout(main_layout)  # Добавляем общий layout в основной layout
 
         self.setLayout(layout)
 
@@ -118,6 +138,8 @@ class DetectWindow(QWidget):
         # Применяем стили
         self.setStyleSheet(self.get_styles())
 
+        # Загрузка данных в текстовые поля
+        self.load_text_data()
 
     def get_styles(self):
         return """
@@ -183,7 +205,31 @@ class DetectWindow(QWidget):
             QComboBox QAbstractItemView::item:selected {
                 background-color: #0056a1;  /* Цвет фона для выбранного элемента */
             }
+
+            QTextEdit {
+                background-color: #151D2C;  /* Цвет фона для текстового поля */
+                color: white;  /* Цвет текста в текстовом поле */
+                border: 1px solid #0056a1;  /* Цвет границы */
+                border-radius: 5px;  /* Закругление углов */
+                padding: 5px;  /* Отступы внутри текстового поля */
+                font-size: 14px;  /* Размер шрифта для текстового поля */
+            }
         """
+
+    def load_text_data(self):
+        """Загружает текстовые данные из эндпоинта."""
+        try:
+            response = requests.get("http://localhost:8000/sirius/files/text")
+            response.raise_for_status()  # Проверка на ошибки HTTP
+            text_data = response.json()  # Предполагаем, что сервер возвращает данные в формате JSON
+
+            # Заполнение текстовых полей
+            self.output_log_left.setPlainText(text_data.get("left", ""))
+            self.output_log_right.setPlainText(text_data.get("right", ""))
+        except requests.exceptions.RequestException as e:
+            logging.error("Ошибка при запросе к серверу: %s", e)
+        except Exception as e:
+            logging.error("Неизвестная ошибка: %s", e)
 
     def load_image_list(self, image_list):
         """Загружает список изображений в выпадающий список."""
@@ -201,6 +247,10 @@ class DetectWindow(QWidget):
             # Подключаем сигнал к слоту для обработки загруженного изображения
             self.load_image_1.image_loaded.connect(self.display_image)
             self.load_image_2.image_loaded.connect(self.display_image)
+
+            # # Заполнение текстовых полей
+            # self.output_log_left.setPlainText(text_data.get("left", ""))
+            # self.output_log_right.setPlainText(text_data.get("right", ""))
 
             # Запускаем потоки
             self.load_image_1.start()

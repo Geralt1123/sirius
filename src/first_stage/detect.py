@@ -9,13 +9,12 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox
 
 
 class ImageLoader(QThread):
-    image_loaded = pyqtSignal(np.ndarray, int)  # Сигнал для передачи загруженного изображения и индекса
+    image_loaded = pyqtSignal(np.ndarray, dict)  # Сигнал для передачи загруженного изображения и данных
 
     def __init__(self, file_id, endpoint):
         super().__init__()
         self.file_id = file_id
         self.endpoint = endpoint
-        self.response_data = None  # Новый атрибут для хранения ответа
 
     def run(self):
         try:
@@ -24,10 +23,10 @@ class ImageLoader(QThread):
             response.raise_for_status()  # Проверка на ошибки HTTP
 
             # Сохраняем ответ в атрибуте
-            self.response_data = response.json()
+            response_data = response.json()
 
             # Извлекаем массив изображения
-            arr = np.array(self.response_data["image"])
+            arr = np.array(response_data["image"])
 
             # Проверка, является ли полученный массив NumPy
             if isinstance(arr, list):
@@ -44,8 +43,8 @@ class ImageLoader(QThread):
                 if arr.shape[2] == 4:  # RGBA
                     arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
 
-                # Отправляем сигнал с загруженным изображением
-                self.image_loaded.emit(arr, 1)  # Индекс 1 для первого изображения
+                # Отправляем сигнал с загруженным изображением и данными
+                self.image_loaded.emit(arr, response_data)  # Передаем данные вместе с изображением
             else:
                 raise ValueError("Полученный массив не является цветным изображением.")
 
@@ -238,51 +237,73 @@ class DetectWindow(QWidget):
             self.load_image_1.start()
             self.load_image_2.start()
 
-    def display_image_1(self, arr):
+    def display_image_1(self, arr, response_data):
         """Отображает первое изображение и заполняет текстовое поле для него."""
-        # Получаем размеры изображения
-        height, width, channel = arr.shape
-        bytes_per_line = 3 * width
+        try:
+            # Получаем размеры изображения
+            height, width, channel = arr.shape
+            bytes_per_line = 3 * width
 
-        # Создание QImage из массива
-        q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+            # Создание QImage из массива
+            q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
 
-        # Создание QPixmap из QImage
-        pixmap = QPixmap.fromImage(q_image)
+            # Создание QPixmap из QImage
+            pixmap = QPixmap.fromImage(q_image)
 
-        # Устанавливаем фиксированные размеры для отображения
-        pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
+            # Устанавливаем фиксированные размеры для отображения
+            pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
 
-        self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
+            self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
 
-        # Заполняем текстовое поле для первого изображения
-        self.fill_text_field(self.load_image_1.response_data, self.output_log_left)
+            # Заполняем текстовое поле для первого изображения
+            if "data" in response_data:
+                self.fill_text_field(response_data["defects"], self.output_log_left)
+            else:
+                logging.error("Ключ 'defects' отсутствует в ответе: %s", response_data)
 
-    def display_image_2(self, arr):
+        except Exception as e:
+            logging.error("Ошибка при отображении первого изображения: %s", e)
+            self.show_error_message("Ошибка при отображении первого изображения.")
+
+    def display_image_2(self, arr, response_data):
         """Отображает второе изображение и заполняет текстовое поле для него."""
-        # Получаем размеры изображения
-        height, width, channel = arr.shape
-        bytes_per_line = 3 * width
+        try:
+            # Получаем размеры изображения
+            height, width, channel = arr.shape
+            bytes_per_line = 3 * width
 
-        # Создание QImage из массива
-        q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+            # Создание QImage из массива
+            q_image = QImage(arr.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
 
-        # Создание QPixmap из QImage
-        pixmap = QPixmap.fromImage(q_image)
+            # Создание QPixmap из QImage
+            pixmap = QPixmap.fromImage(q_image)
 
-        # Устанавливаем фиксированные размеры для отображения
-        pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
+            # Устанавливаем фиксированные размеры для отображения
+            pixmap = pixmap.scaled(1024, 128, Qt.AspectRatioMode.KeepAspectRatio)  # Масштабируем изображение
 
-        self.image_label_2.setPixmap(pixmap)  # Устанавливаем второе изображение
+            self.image_label_2.setPixmap(pixmap)  # Устанавливаем второе изображение
 
-        # Заполняем текстовое поле для второго изображения
-        self.fill_text_field(self.load_image_2.response_data, self.output_log_right)
+            # Заполняем текстовое поле для второго изображения
+            if "defects" in response_data:
+                self.fill_text_field(response_data["data"], self.output_log_right)
+            else:
+                logging.error("Ключ 'data' отсутствует в ответе: %s", response_data)
+
+        except Exception as e:
+            logging.error("Ошибка при отображении второго изображения: %s", e)
+            self.show_error_message("Ошибка при отображении второго изображения.")
 
     def fill_text_field(self, response_data, text_edit):
         """Заполняет текстовое поле данными из ответа."""
-        if response_data:
-            defects_info = {"defects": response_data.get("defects", 0)}
-            text_edit.setPlainText(str(defects_info))
+        try:
+            if isinstance(response_data, dict):
+                text_edit.setPlainText(str(response_data))  # Заполняем текстовое поле данными
+            else:
+                logging.error("Ожидался словарь, но получен: %s", type(response_data))
+                text_edit.setPlainText("Ошибка: Неверный формат данных.")
+        except Exception as e:
+            logging.error("Ошибка при заполнении текстового поля: %s", e)
+            text_edit.setPlainText("Ошибка при заполнении текстового поля.")
 
     def show_error_message(self, message):
         """Отображает модальное окно с сообщением об ошибке."""

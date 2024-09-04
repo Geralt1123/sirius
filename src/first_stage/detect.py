@@ -5,7 +5,8 @@ import requests
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QThread
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QFileDialog, QHBoxLayout, \
-    QSpacerItem, QSizePolicy
+    QSpacerItem, QSizePolicy, QMessageBox
+
 
 class ImageLoader(QThread):
     image_loaded = pyqtSignal(np.ndarray, int)  # Сигнал для передачи загруженного изображения и индекса
@@ -223,15 +224,58 @@ class DetectWindow(QWidget):
         self.image_label_1.setPixmap(pixmap)  # Устанавливаем первое изображение
         self.image_label_2.setPixmap(pixmap)  # Устанавливаем второе изображение
 
+    def show_error_message(self, message):
+        """Отображает модальное окно с сообщением об ошибке."""
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setText(message)
+        msg_box.setWindowTitle("Ошибка")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+        # Применяем стили
+        msg_box.setStyleSheet(self.get_styles())
+
+        msg_box.exec()
 
     def save_image(self):
-        """Сохраняет текущее изображение."""
-        if self.image_label_1.pixmap() is not None:
-            options = QFileDialog.Options()
-            file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить изображение", "", "Images (*.png *.jpg *.bmp);;All Files (*)", options=options)
-            if file_name:
-                # Получаем текущее изображение и сохраняем его
-                current_pixmap = self.image_label_1.pixmap()
-                current_pixmap.save(file_name)
+        """Сохраняет текущее изображение в формате PNG с соответствующими именами."""
+        selected_image_id = self.image_selector.currentText()
+
+        if selected_image_id:
+            # Сохраняем первое изображение (Конструктивные элементы)
+            initial_file_name_1 = f"{selected_image_id}_Конструктивные_элементы.png"
+            file_name_1, _ = QFileDialog.getSaveFileName(self,
+                                                         f"Сохранить изображение {selected_image_id} - Конструктивные элементы",
+                                                         initial_file_name_1,
+                                                         "Images (*.png);;All Files (*)")
+
+            if file_name_1:
+                try:
+                    # Получаем текущее изображение и сохраняем его
+                    current_pixmap_1 = self.image_label_1.pixmap()
+                    if current_pixmap_1 is not None:
+                        current_pixmap_1.save(file_name_1)
+                    else:
+                        self.show_error_message("Нет изображения для сохранения в 'Конструктивные элементы'.")
+                except Exception as e:
+                    self.show_error_message(f"Ошибка при сохранении изображения 'Конструктивные элементы': {str(e)}")
+
+            # Сохраняем второе изображение (Дефекты)
+            initial_file_name_2 = f"{selected_image_id}_Дефекты.png"
+            file_name_2, _ = QFileDialog.getSaveFileName(self,
+                                                         f"Сохранить изображение {selected_image_id} - Дефекты",
+                                                         initial_file_name_2,
+                                                         "Images (*.png);;All Files (*)")
+
+            if file_name_2:
+                try:
+                    # Получаем текущее изображение и сохраняем его
+                    current_pixmap_2 = self.image_label_2.pixmap()
+                    if current_pixmap_2 is not None:
+                        current_pixmap_2.save(file_name_2)
+                    else:
+                        self.show_error_message("Нет изображения для сохранения в 'Дефекты'.")
+                except Exception as e:
+                    self.show_error_message(f"Ошибка при сохранении изображения 'Дефекты': {str(e)}")
         else:
-            print("Нет изображения для сохранения.")
+            self.show_error_message("Нет изображения для сохранения.")

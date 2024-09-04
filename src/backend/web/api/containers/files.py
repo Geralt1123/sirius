@@ -66,7 +66,7 @@ class FileControllerContainer(containers.DeclarativeContainer):
     )
 
     file_predict_controller_2 = providers.Factory(
-        FilePredictController,
+        FilePredictControllerTwo,
         orm_unit_of_work=file_uow,
         storage_repository=storage.s3_repository,
     )

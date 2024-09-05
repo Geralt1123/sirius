@@ -257,7 +257,11 @@ class DetectWindow(QWidget):
 
             # Заполняем текстовое поле для первого изображения
             if "data" in response_data:
-                self.fill_text_field(response_data["defects"], self.output_log_left)
+                self.output_log_left.setPlainText(f"На магнитограмме найдено : \n"
+                                                   f"Сварочных швов: {response_data['data']['0']}\n"
+                                                   f"Изгибов: {response_data['data']['1']}\n"
+                                                   f"Разветвлений: {response_data['data']['2']}\n"
+                                                   f"заплаток: {response_data['data']['3']}")
             else:
                 logging.error("Ключ 'defects' отсутствует в ответе: %s", response_data)
 
@@ -265,7 +269,7 @@ class DetectWindow(QWidget):
             logging.error("Ошибка при отображении первого изображения: %s", e)
             self.show_error_message("Ошибка при отображении первого изображения.")
 
-    def display_image_2(self, arr, response_data):
+    def display_image_2(self, arr, response_data, ):
         """Отображает второе изображение и заполняет текстовое поле для него."""
         try:
             # Получаем размеры изображения
@@ -285,7 +289,7 @@ class DetectWindow(QWidget):
 
             # Заполняем текстовое поле для второго изображения
             if "defects" in response_data:
-                self.fill_text_field(response_data["data"], self.output_log_right)
+                self.output_log_right.setPlainText(f"На магнитограмме найдено {response_data['defects']} дефектов")
             else:
                 logging.error("Ключ 'data' отсутствует в ответе: %s", response_data)
 
@@ -293,17 +297,6 @@ class DetectWindow(QWidget):
             logging.error("Ошибка при отображении второго изображения: %s", e)
             self.show_error_message("Ошибка при отображении второго изображения.")
 
-    def fill_text_field(self, response_data, text_edit):
-        """Заполняет текстовое поле данными из ответа."""
-        try:
-            if isinstance(response_data, dict):
-                text_edit.setPlainText(str(response_data))  # Заполняем текстовое поле данными
-            else:
-                logging.error("Ожидался словарь, но получен: %s", type(response_data))
-                text_edit.setPlainText("Ошибка: Неверный формат данных.")
-        except Exception as e:
-            logging.error("Ошибка при заполнении текстового поля: %s", e)
-            text_edit.setPlainText("Ошибка при заполнении текстового поля.")
 
     def show_error_message(self, message):
         """Отображает модальное окно с сообщением об ошибке."""

@@ -463,11 +463,11 @@ class MainWindow(QMainWindow):
         # Выпадающий список для выбора класса
         self.class_combo_box = QComboBox()
         self.class_combo_box.addItems([
-            "Коррозия",
-            "Трещины",
-            "Увеличение толщины",
-            "Изменение цвета",
-            "Утечки"
+            "Сварочный шов",
+            "Изгиб",
+            "Разветвление",
+            "Заплатка",
+            "Дефект"
         ])
         right_panel.addWidget(self.class_combo_box)
         right_panel.addSpacing(10)
@@ -645,11 +645,11 @@ class MainWindow(QMainWindow):
         logging.debug("Сохранение разметки в формате JSON: %s", json_output)
 
         class_to_index = {
-            "Коррозия": 0,
-            "Трещины": 1,
-            "Увеличение толщины": 2,
-            "Изменение цвета": 3,
-            "Утечки": 4
+            "Сварочный шов": 0,
+            "Изгиб": 1,
+            "Разветвление": 2,
+            "Заплатка": 3,
+            "Дефект": 4
         }
 
         if self.editable_image_label.current_uid in self.editable_image_label.markings_dict:
